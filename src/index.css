@@ -3,22 +3,22 @@
 @layer base {
   :root {
     --font-poppins: 'Poppins', sans-serif;
-    --bg-main: #f6fbf4;
+    --bg-main: #ffffff;
     --bg-surface: #ffffff;
     --bg-surface-elevated: #ffffff;
-    --text-primary: #1f2d1f;
-    --text-secondary: #526352;
-    --text-muted: #829282;
+    --text-primary: #111827;
+    --text-secondary: #4b5563;
+    --text-muted: #9ca3af;
     --brand-primary: #1b4332;
     --brand-primary-hover: #143526;
     --brand-secondary: #2d6a4f;
     --brand-accent: #52b788;
-    --brand-light: #d8f3dc;
-    --brand-light-border: #b7e4c7;
+    --brand-light: #ecfdf5;
+    --brand-light-border: #d1fae5;
     --earth-accent: #b08968;
-    --border-color: #e2ede0;
-    --card-shadow: 0 4px 20px -2px rgba(27, 67, 50, 0.06), 0 2px 6px -1px rgba(27, 67, 50, 0.04);
-    --card-shadow-hover: 0 12px 32px -4px rgba(27, 67, 50, 0.12), 0 4px 12px -2px rgba(27, 67, 50, 0.08);
+    --border-color: #e5e7eb;
+    --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
+    --card-shadow-hover: 0 12px 32px -4px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.05);
   }
 
   .dark {

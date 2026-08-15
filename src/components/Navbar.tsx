@@ -33,6 +33,7 @@ export const Navbar: React.FC = () => {
   const {
     user,
     profile,
+    isAdmin,
     setIsAuthOpen,
     setAuthMode,
     logout
@@ -83,39 +84,38 @@ export const Navbar: React.FC = () => {
 
   const navLinks = [
     { id: 'home', label: 'Home' },
-    { id: 'shop', label: 'Shop All' },
-    { id: 'vermicompost', label: 'Vermicompost', categoryId: 'cat-1' },
-    { id: 'indoor-plants', label: 'Indoor Plants', categoryId: 'cat-3' },
-    { id: 'fertilizers', label: 'Organic Fertilizers', categoryId: 'cat-2' },
-    { id: 'tools', label: 'Gardening Tools', categoryId: 'cat-6' },
+    { id: 'cat-1', label: 'Plants', categoryId: 'cat-1' },
+    { id: 'cat-3', label: 'Planters', categoryId: 'cat-3' },
+    { id: 'cat-4', label: 'Vermicompost', categoryId: 'cat-4' },
+    { id: 'cat-5', label: 'Seeds & Soil', categoryId: 'cat-5' },
+    { id: 'cat-6', label: 'Plant Care', categoryId: 'cat-6' },
+    { id: 'cat-7', label: 'Gift Cards', categoryId: 'cat-7' },
   ];
 
   return (
-    <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-[#f6fbf4]/90 dark:bg-[#0e1710]/90 border-b border-[#e2ede0] dark:border-[#243828] transition-colors duration-200">
-      {/* Top Banner */}
-      <div className="bg-[#1b4332] text-[#d8f3dc] text-xs font-medium py-1.5 px-4 text-center tracking-wide flex items-center justify-center gap-3">
-        <span>🌱 {settings.heroBanner?.discountPillText || 'Special Launch Offer: Use code PLANSIO10 for 10% OFF'}</span>
-        <span className="hidden md:inline text-white/50">•</span>
-        <span className="hidden md:inline">🚚 Free Express Delivery on orders above ₹499</span>
+    <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-white/95 dark:bg-[#0e1710]/95 border-b border-gray-200 dark:border-[#243828] transition-colors duration-200">
+      {/* Top Announcement Banner */}
+      <div className="bg-[#0e3b24] text-white text-xs font-semibold py-2 px-4 text-center tracking-wide flex items-center justify-center gap-2 shadow-xs">
+        <span>🚚 FREE SHIPPING on orders above ₹999 | Extra 5% OFF on Prepaid Orders 🎁</span>
       </div>
 
       {/* Main Navbar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between h-20 gap-4">
           
           {/* Mobile Menu Button */}
           <div className="flex items-center lg:hidden">
             <button
               id="mobile-menu-toggle"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-2 rounded-lg text-[#1f2d1f] dark:text-[#eaf2eb] hover:bg-[#e2ede0] dark:hover:bg-[#1c2e20] transition-colors"
+              className="p-2 rounded-lg text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               aria-label="Toggle menu"
             >
               {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
 
-          {/* Brand Logo - Supports Dynamic Custom Uploaded Transparent Logo with Sizing, Filters and Position Offsets */}
+          {/* Brand Logo */}
           <div
             className={`flex items-center gap-2 ${
               settings.logoPlacement === 'corner' ? '-ml-2 sm:-ml-4' : ''
@@ -131,212 +131,281 @@ export const Navbar: React.FC = () => {
                 setActiveTab('home');
                 setFilters(prev => ({ ...prev, category: 'all', searchQuery: '' }));
               }}
-              className="flex items-center gap-2.5 text-left group p-1 -ml-1 rounded-2xl hover:bg-emerald-50/50 dark:hover:bg-white/5 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2d6a4f]"
+              className="flex items-center gap-2.5 text-left group p-1 -ml-1 rounded-2xl hover:opacity-90 transition-all duration-200 focus:outline-none cursor-pointer"
               title={`Go to ${settings.brandName || 'PLANSIO'} Home`}
             >
               {settings.logoUrl ? (
-                // Custom Uploaded Entire Logo (with Background Removed / Transparency Support)
-                settings.logoDisplayMode === 'logo-with-text' ? (
-                  <>
-                    <div
-                      style={{
-                        height: `${settings.logoHeight || 44}px`,
-                        maxWidth: `${settings.logoMaxWidth || 300}px`
-                      }}
-                      className={`flex items-center justify-center overflow-hidden rounded-xl transition-all duration-200 ${
-                        settings.logoBackdropStyle === 'white-pill'
-                          ? 'bg-white px-3 py-1 shadow-sm border border-gray-200'
-                          : settings.logoBackdropStyle === 'dark-pill'
-                          ? 'bg-[#101c13] px-3 py-1 shadow-sm border border-white/10'
-                          : settings.logoBackdropStyle === 'frosted-glass'
-                          ? 'bg-white/80 dark:bg-black/40 backdrop-blur-md px-3 py-1 shadow-sm border border-white/30'
-                          : settings.logoBackdropStyle === 'emerald-badge'
-                          ? 'bg-emerald-950/80 px-3 py-1 rounded-xl border border-emerald-500/30 shadow-sm'
-                          : 'bg-transparent'
-                      }`}
-                    >
-                      <img
-                        src={settings.logoUrl}
-                        alt={settings.brandName || 'Company Logo'}
-                        referrerPolicy="no-referrer"
-                        style={{
-                          height: `${settings.logoHeight || 44}px`,
-                          ...(settings.logoColorFilter === 'invert-white'
-                            ? { filter: 'brightness(0) invert(1)' }
-                            : settings.logoColorFilter === 'brightness-boost'
-                            ? { filter: 'brightness(1.6) contrast(1.15)' }
-                            : settings.logoColorFilter === 'glow-white'
-                            ? { filter: 'drop-shadow(0 0 8px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 2px rgba(255, 255, 255, 1))' }
-                            : settings.logoColorFilter === 'glow-emerald'
-                            ? { filter: 'drop-shadow(0 0 10px rgba(52, 211, 153, 0.9)) drop-shadow(0 0 2px rgba(16, 185, 129, 0.8))' }
-                            : settings.logoColorFilter === 'gold-glow'
-                            ? { filter: 'drop-shadow(0 0 10px rgba(251, 191, 36, 0.9)) sepia(0.3) saturate(1.4)' }
-                            : {})
-                        }}
-                        className="w-auto max-w-full object-contain select-none transition-transform duration-200 group-hover:scale-102"
-                      />
-                    </div>
-                    <div className="flex flex-col justify-center">
-                      <span className="text-2xl font-black tracking-tight text-[#1b4332] dark:text-[#74c69d] block leading-none font-['Poppins'] group-hover:text-[#2d6a4f] dark:group-hover:text-[#95d5b2] transition-colors">
-                        {settings.brandName || 'PLANSIO'}
-                      </span>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#526352] dark:text-[#a3b8a6] block mt-0.5 group-hover:text-[#1b4332] dark:group-hover:text-[#d8f3dc] transition-colors">
-                        {settings.tagline || 'Grow Better. Live Greener.'}
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  // Full Logo Image (Complete replacement of brand mark + text)
-                  <div
-                    style={{
-                      height: `${settings.logoHeight || 48}px`,
-                      maxWidth: `${settings.logoMaxWidth || 320}px`
-                    }}
-                    className={`flex items-center justify-center overflow-hidden rounded-xl transition-all duration-200 ${
-                      settings.logoBackdropStyle === 'white-pill'
-                        ? 'bg-white px-3 py-1 shadow-sm border border-gray-200'
-                        : settings.logoBackdropStyle === 'dark-pill'
-                        ? 'bg-[#101c13] px-3 py-1 shadow-sm border border-white/10'
-                        : settings.logoBackdropStyle === 'frosted-glass'
-                        ? 'bg-white/80 dark:bg-black/40 backdrop-blur-md px-3 py-1 shadow-sm border border-white/30'
-                        : settings.logoBackdropStyle === 'emerald-badge'
-                        ? 'bg-emerald-950/80 px-3 py-1 rounded-xl border border-emerald-500/30 shadow-sm'
-                        : 'bg-transparent'
-                    }`}
-                  >
-                    <img
-                      src={settings.logoUrl}
-                      alt={settings.brandName || 'Company Logo'}
-                      referrerPolicy="no-referrer"
-                      style={{
-                        height: `${settings.logoHeight || 48}px`,
-                        ...(settings.logoColorFilter === 'invert-white'
-                          ? { filter: 'brightness(0) invert(1)' }
-                          : settings.logoColorFilter === 'brightness-boost'
-                          ? { filter: 'brightness(1.6) contrast(1.15)' }
-                          : settings.logoColorFilter === 'glow-white'
-                          ? { filter: 'drop-shadow(0 0 8px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 2px rgba(255, 255, 255, 1))' }
-                          : settings.logoColorFilter === 'glow-emerald'
-                          ? { filter: 'drop-shadow(0 0 10px rgba(52, 211, 153, 0.9)) drop-shadow(0 0 2px rgba(16, 185, 129, 0.8))' }
-                          : settings.logoColorFilter === 'gold-glow'
-                          ? { filter: 'drop-shadow(0 0 10px rgba(251, 191, 36, 0.9)) sepia(0.3) saturate(1.4)' }
-                          : {})
-                      }}
-                      className="w-auto max-w-full object-contain select-none transition-transform duration-200 group-hover:scale-102"
-                    />
-                  </div>
-                )
+                <img
+                  src={settings.logoUrl}
+                  alt={settings.brandName || 'PLANSIO'}
+                  referrerPolicy="no-referrer"
+                  style={{
+                    height: `${settings.logoHeight || 44}px`,
+                    maxWidth: `${settings.logoMaxWidth || 300}px`
+                  }}
+                  className="w-auto max-w-full object-contain select-none"
+                />
               ) : (
-                // Default Botanical Emblem & PLANSIO Typography
-                <>
-                  <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-[#1b4332] via-[#24533e] to-[#2d6a4f] dark:from-[#2d6a4f] dark:to-[#52b788] flex items-center justify-center text-white shadow-md shadow-[#1b4332]/25 group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-[#1b4332]/30 transition-all duration-300 ring-2 ring-emerald-500/20">
-                    <Sprout className="w-6 h-6 text-[#d8f3dc]" />
-                  </div>
-                  <div className="flex flex-col justify-center">
-                    <span className="text-2xl font-black tracking-tight text-[#1b4332] dark:text-[#74c69d] block leading-none font-['Poppins'] group-hover:text-[#2d6a4f] dark:group-hover:text-[#95d5b2] transition-colors">
-                      {settings.brandName || 'PLANSIO'}
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-1">
+                    <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#0e3b24] dark:text-emerald-400 font-serif leading-none">
+                      PLANSIO
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#526352] dark:text-[#a3b8a6] block mt-0.5 group-hover:text-[#1b4332] dark:group-hover:text-[#d8f3dc] transition-colors">
-                      {settings.tagline || 'Grow Better. Live Greener.'}
-                    </span>
+                    <span className="text-emerald-600 dark:text-emerald-400 text-sm -mt-3 font-serif">🌱</span>
                   </div>
-                </>
+                  <span className="text-[10px] font-medium tracking-wide text-gray-600 dark:text-gray-400 block -mt-0.5">
+                    Plant. Decor. Live Better.
+                  </span>
+                </div>
               )}
             </button>
           </div>
 
-          {/* Desktop Navigation Links */}
+          {/* Desktop Navigation Links with Dropdown Indicators */}
           <nav className="hidden lg:flex items-center gap-1 xl:gap-2">
-            {navLinks.map(link => (
-              <button
-                key={link.id}
-                id={`nav-link-${link.id}`}
-                onClick={() => {
-                  if (link.categoryId) {
-                    setFilters(prev => ({ ...prev, category: link.categoryId, searchQuery: '' }));
-                    setActiveTab('shop');
-                  } else {
-                    setActiveTab(link.id);
-                    if (link.id === 'shop') setFilters(prev => ({ ...prev, category: 'all' }));
-                  }
-                }}
-                className={`px-3.5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                  activeTab === link.id || (link.categoryId && filters.category === link.categoryId && activeTab === 'shop')
-                    ? 'bg-[#1b4332] text-white shadow-sm dark:bg-[#40916c]'
-                    : 'text-[#1f2d1f] dark:text-[#eaf2eb] hover:bg-[#e2ede0]/70 dark:hover:bg-[#1c2e20]'
-                }`}
-              >
-                {link.label}
-              </button>
-            ))}
-          </nav>
-
-          {/* Right Action Icons */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5">
-            
-            {/* Admin Panel Quick Access */}
             <button
-              id="nav-admin-panel-btn"
-              onClick={() => setActiveTab('admin')}
-              title="Open Admin Panel"
-              className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${
-                activeTab === 'admin'
-                  ? 'bg-[#1b4332] text-white border-[#1b4332] dark:bg-[#40916c] dark:border-[#40916c]'
-                  : 'bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100'
+              onClick={() => {
+                setActiveTab('home');
+                setFilters(prev => ({ ...prev, category: 'all', searchQuery: '' }));
+              }}
+              className={`px-3 py-2 text-sm font-medium transition-colors cursor-pointer ${
+                activeTab === 'home'
+                  ? 'text-[#0e3b24] dark:text-emerald-400 font-bold border-b-2 border-[#0e3b24] dark:border-emerald-400'
+                  : 'text-gray-700 dark:text-gray-200 hover:text-[#0e3b24]'
               }`}
             >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Admin Panel</span>
+              Home
             </button>
 
-            {/* Dark Mode Toggle */}
             <button
-              id="theme-toggle-btn"
-              onClick={toggleDarkMode}
-              className="p-2 rounded-full text-[#1f2d1f] dark:text-[#eaf2eb] hover:bg-[#e2ede0] dark:hover:bg-[#1c2e20] transition-colors"
-              aria-label="Toggle theme"
+              onClick={() => {
+                setFilters(prev => ({ ...prev, category: 'cat-1', searchQuery: '' }));
+                setActiveTab('home');
+                const el = document.getElementById('home-all-products');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-[#0e3b24] flex items-center gap-1 cursor-pointer"
             >
-              {isDarkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-slate-700" />}
+              <span>Plants</span>
+              <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
             </button>
 
-            {/* Search Trigger */}
-            <div className="relative">
-              {isSearchOpen ? (
-                <form onSubmit={handleSearchSubmit} className="flex items-center">
-                  <input
-                    ref={searchRef}
-                    type="text"
-                    placeholder="Search vermicompost, plants..."
-                    value={searchInput}
-                    onChange={e => setSearchInput(e.target.value)}
-                    className="w-48 sm:w-64 pl-3 pr-8 py-1.5 text-sm bg-white dark:bg-[#142217] border border-[#2d6a4f] rounded-full focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] text-[#1f2d1f] dark:text-white"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setIsSearchOpen(false)}
-                    className="absolute right-2.5 text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </form>
+            <button
+              onClick={() => {
+                setFilters(prev => ({ ...prev, category: 'cat-3', searchQuery: '' }));
+                setActiveTab('home');
+                const el = document.getElementById('home-all-products');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-[#0e3b24] flex items-center gap-1 cursor-pointer"
+            >
+              <span>Planters</span>
+              <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+            </button>
+
+            <button
+              onClick={() => {
+                setFilters(prev => ({ ...prev, category: 'cat-4', searchQuery: '' }));
+                setActiveTab('home');
+                const el = document.getElementById('home-all-products');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-[#0e3b24] flex items-center gap-1 cursor-pointer"
+            >
+              <span>Vermicompost</span>
+              <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+            </button>
+
+            <button
+              onClick={() => {
+                setFilters(prev => ({ ...prev, category: 'cat-5', searchQuery: '' }));
+                setActiveTab('home');
+                const el = document.getElementById('home-all-products');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-[#0e3b24] flex items-center gap-1 cursor-pointer"
+            >
+              <span>Seeds & Soil</span>
+              <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+            </button>
+
+            <button
+              onClick={() => {
+                setFilters(prev => ({ ...prev, category: 'cat-6', searchQuery: '' }));
+                setActiveTab('home');
+                const el = document.getElementById('home-all-products');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-[#0e3b24] flex items-center gap-1 cursor-pointer"
+            >
+              <span>Plant Care</span>
+              <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+            </button>
+
+            <button
+              onClick={() => {
+                setFilters(prev => ({ ...prev, category: 'cat-7', searchQuery: '' }));
+                setActiveTab('home');
+                const el = document.getElementById('home-all-products');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-[#0e3b24] cursor-pointer"
+            >
+              Gift Cards
+            </button>
+          </nav>
+
+          {/* Right Action Section: Search Bar & Icons */}
+          <div className="flex items-center gap-3">
+            
+            {/* Inline Search Bar matching Mockup */}
+            <form onSubmit={handleSearchSubmit} className="relative hidden md:block w-48 sm:w-60 lg:w-64">
+              <input
+                ref={searchRef}
+                type="text"
+                placeholder="Search for plants, pots..."
+                value={searchInput}
+                onChange={e => setSearchInput(e.target.value)}
+                className="w-full pl-3.5 pr-9 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#142217] text-gray-800 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0e3b24]"
+              />
+              <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-[#0e3b24]">
+                <Search className="w-4 h-4" />
+              </button>
+            </form>
+
+            {/* User Profile Button / Dropdown */}
+            <div className="relative" ref={userDropdownRef}>
+              {user ? (
+                <button
+                  id="nav-user-profile-btn"
+                  onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                  className="flex items-center gap-1 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                  aria-label="User account"
+                >
+                  <div className="w-8 h-8 rounded-full overflow-hidden border border-[#0e3b24] bg-[#eaf4ee] flex items-center justify-center text-xs font-bold text-[#0e3b24]">
+                    {profile?.avatar_url ? (
+                      <img
+                        src={profile.avatar_url}
+                        alt={profile.full_name || 'User'}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      profile?.full_name?.charAt(0) || user.email?.charAt(0).toUpperCase() || 'U'
+                    )}
+                  </div>
+                  <ChevronDown className="w-3 h-3 text-gray-500 hidden sm:block" />
+                </button>
               ) : (
                 <button
-                  id="nav-search-btn"
-                  onClick={() => setIsSearchOpen(true)}
-                  className="p-2 rounded-full text-[#1f2d1f] dark:text-[#eaf2eb] hover:bg-[#e2ede0] dark:hover:bg-[#1c2e20] transition-colors"
-                  aria-label="Open search"
+                  id="nav-user-profile-btn"
+                  onClick={() => {
+                    setAuthMode('login');
+                    setIsAuthOpen(true);
+                  }}
+                  className="p-2 rounded-full text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                  aria-label="User account"
                 >
-                  <Search className="w-5 h-5" />
+                  <User className="w-5 h-5" />
                 </button>
+              )}
+
+              {/* User Dropdown Menu */}
+              {isUserDropdownOpen && user && (
+                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#142217] rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 py-2 z-50 animate-fade-in">
+                  <div className="px-4 py-2.5 border-b border-gray-100 dark:border-gray-800">
+                    <p className="text-xs font-semibold text-gray-400">Signed in as</p>
+                    <p className="text-sm font-bold text-[#0e3b24] dark:text-[#eaf2eb] truncate">
+                      {profile?.full_name || user.email}
+                    </p>
+                    <p className="text-[11px] text-gray-500 truncate">{user.email}</p>
+                  </div>
+
+                  <button
+                    id="user-profile-menu-item"
+                    onClick={() => {
+                      setActiveTab('profile');
+                      setIsUserDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-[#f6fbf4] dark:hover:bg-[#1c2e20] flex items-center gap-2.5"
+                  >
+                    <User className="w-4 h-4 text-[#0e3b24]" />
+                    <span>My Account & Orders</span>
+                  </button>
+
+                  <button
+                    id="user-tracking-menu-item"
+                    onClick={() => {
+                      setActiveTab('tracking');
+                      setIsUserDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-[#f6fbf4] dark:hover:bg-[#1c2e20] flex items-center gap-2.5"
+                  >
+                    <Truck className="w-4 h-4 text-[#0e3b24]" />
+                    <span>Track Live Delivery</span>
+                  </button>
+
+                  <button
+                    id="user-wishlist-menu-item"
+                    onClick={() => {
+                      setActiveTab('wishlist');
+                      setIsUserDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-[#f6fbf4] dark:hover:bg-[#1c2e20] flex items-center gap-2.5"
+                  >
+                    <Heart className="w-4 h-4 text-rose-500" />
+                    <span>My Saved Wishlist</span>
+                  </button>
+
+                  {isAdmin && (
+                    <button
+                      id="user-admin-menu-item"
+                      onClick={() => {
+                        setActiveTab('admin');
+                        setIsUserDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-emerald-800 dark:text-emerald-300 font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-950/40 flex items-center gap-2.5"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                      <span>Admin Console</span>
+                    </button>
+                  )}
+
+                  <div className="border-t border-gray-100 dark:border-gray-800 my-1" />
+                  
+                  <button
+                    id="user-logout-btn"
+                    onClick={() => {
+                      logout();
+                      setIsUserDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2.5"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
               )}
             </div>
 
-            {/* Wishlist */}
+            {/* Admin Console Quick Pill (Only for Administrator) */}
+            {isAdmin && (
+              <button
+                id="nav-admin-quick-btn"
+                onClick={() => setActiveTab('admin')}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 text-xs font-bold border border-emerald-300 dark:border-emerald-700 shadow-xs hover:bg-emerald-200 dark:hover:bg-emerald-900 transition-all cursor-pointer"
+                title="Open Administrator Console"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+                <span>Admin Console</span>
+              </button>
+            )}
+
+            {/* Wishlist Button */}
             <button
               id="nav-wishlist-btn"
               onClick={() => setActiveTab('wishlist')}
-              className="relative p-2 rounded-full text-[#1f2d1f] dark:text-[#eaf2eb] hover:bg-[#e2ede0] dark:hover:bg-[#1c2e20] transition-colors"
+              className="relative p-2 rounded-full text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
               aria-label="View wishlist"
             >
               <Heart className="w-5 h-5" />
@@ -347,138 +416,20 @@ export const Navbar: React.FC = () => {
               )}
             </button>
 
-            {/* Cart Button */}
+            {/* Cart Button with Count Badge */}
             <button
               id="nav-cart-btn"
               onClick={() => setIsCartOpen(true)}
-              className="relative p-2 rounded-full text-[#1f2d1f] dark:text-[#eaf2eb] hover:bg-[#e2ede0] dark:hover:bg-[#1c2e20] transition-colors"
-              aria-label="Open cart"
+              className="relative p-2 rounded-full text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+              aria-label="View shopping cart"
             >
               <ShoppingBag className="w-5 h-5" />
-              {cartCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-[#1b4332] text-white text-[11px] font-bold flex items-center justify-center dark:bg-[#52b788]">
-                  {cartCount}
-                </span>
-              )}
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#0e3b24] text-white text-[10px] font-bold flex items-center justify-center">
+                {cartCount}
+              </span>
             </button>
 
-            {/* User Account / Profile Dropdown */}
-            <div className="relative" ref={userDropdownRef}>
-              {user ? (
-                <div>
-                  <button
-                    id="user-menu-btn"
-                    onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                    className="flex items-center gap-1.5 p-1.5 rounded-full hover:bg-[#e2ede0] dark:hover:bg-[#1c2e20] transition-colors"
-                  >
-                    <div className="w-8 h-8 rounded-full overflow-hidden border border-[#2d6a4f] bg-[#d8f3dc] flex items-center justify-center text-xs font-bold text-[#1b4332]">
-                      {profile?.avatar_url ? (
-                        <img
-                          src={profile.avatar_url}
-                          alt={profile.full_name || 'User'}
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        profile?.full_name?.charAt(0) || user.email?.charAt(0).toUpperCase() || 'U'
-                      )}
-                    </div>
-                    <ChevronDown className="w-3.5 h-3.5 text-gray-500 hidden sm:block" />
-                  </button>
-
-                  {/* Dropdown Menu */}
-                  {isUserDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#142217] rounded-2xl shadow-xl border border-[#e2ede0] dark:border-[#243828] py-2 z-50 animate-fade-in">
-                      <div className="px-4 py-2.5 border-b border-gray-100 dark:border-gray-800">
-                        <p className="text-xs font-semibold text-gray-400">Signed in as</p>
-                        <p className="text-sm font-bold text-[#1b4332] dark:text-[#eaf2eb] truncate">
-                          {profile?.full_name || user.email}
-                        </p>
-                        <p className="text-[11px] text-gray-500 truncate">{user.email}</p>
-                      </div>
-
-                      <button
-                        id="user-profile-menu-item"
-                        onClick={() => {
-                          setActiveTab('profile');
-                          setIsUserDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-[#1f2d1f] dark:text-[#eaf2eb] hover:bg-[#f6fbf4] dark:hover:bg-[#1c2e20] flex items-center gap-2.5"
-                      >
-                        <User className="w-4 h-4 text-[#2d6a4f]" />
-                        <span>My Account & Orders</span>
-                      </button>
-
-                      <button
-                        id="user-tracking-menu-item"
-                        onClick={() => {
-                          setActiveTab('tracking');
-                          setIsUserDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-[#1f2d1f] dark:text-[#eaf2eb] hover:bg-[#f6fbf4] dark:hover:bg-[#1c2e20] flex items-center gap-2.5"
-                      >
-                        <Truck className="w-4 h-4 text-[#2d6a4f]" />
-                        <span>Track Live Delivery</span>
-                      </button>
-
-                      <button
-                        id="user-wishlist-menu-item"
-                        onClick={() => {
-                          setActiveTab('wishlist');
-                          setIsUserDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-[#1f2d1f] dark:text-[#eaf2eb] hover:bg-[#f6fbf4] dark:hover:bg-[#1c2e20] flex items-center gap-2.5"
-                      >
-                        <Heart className="w-4 h-4 text-rose-500" />
-                        <span>My Saved Wishlist</span>
-                      </button>
-
-                      <button
-                        id="user-admin-menu-item"
-                        onClick={() => {
-                          setActiveTab('admin');
-                          setIsUserDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-4 py-2.5 text-sm text-emerald-800 dark:text-emerald-300 font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-950/40 flex items-center gap-2.5"
-                      >
-                        <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                        <span>Admin Console</span>
-                      </button>
-
-                      <div className="border-t border-gray-100 dark:border-gray-800 my-1" />
-                      
-                      <button
-                        id="user-logout-btn"
-                        onClick={() => {
-                          logout();
-                          setIsUserDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2.5"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        <span>Sign Out</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center gap-1">
-                  <button
-                    id="nav-login-btn"
-                    onClick={() => {
-                      setAuthMode('login');
-                      setIsAuthOpen(true);
-                    }}
-                    className="px-3.5 py-1.5 text-xs font-bold rounded-full bg-[#1b4332] text-white hover:bg-[#143526] transition-colors dark:bg-[#40916c] dark:hover:bg-[#52b788]"
-                  >
-                    Sign In
-                  </button>
-                </div>
-              )}
-            </div>
-
           </div>
-
         </div>
       </div>
 
@@ -491,10 +442,15 @@ export const Navbar: React.FC = () => {
               onClick={() => {
                 if (link.categoryId) {
                   setFilters(prev => ({ ...prev, category: link.categoryId, searchQuery: '' }));
-                  setActiveTab('shop');
+                  setActiveTab('home');
+                  const el = document.getElementById('home-all-products');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
                 } else {
                   setActiveTab(link.id);
-                  if (link.id === 'shop') setFilters(prev => ({ ...prev, category: 'all' }));
+                  if (link.id === 'home') {
+                    setFilters(prev => ({ ...prev, category: 'all' }));
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
                 }
                 setIsMobileMenuOpen(false);
               }}
@@ -507,24 +463,25 @@ export const Navbar: React.FC = () => {
               {link.label}
             </button>
           ))}
-          <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center">
+          {isAdmin && (
             <button
               onClick={() => {
                 setActiveTab('admin');
                 setIsMobileMenuOpen(false);
               }}
-              className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60"
+              className="w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 flex items-center gap-2"
             >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
               <span>Admin Console</span>
             </button>
-
+          )}
+          <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center">
             <button
               onClick={() => {
                 setActiveTab('tracking');
                 setIsMobileMenuOpen(false);
               }}
-              className="text-xs font-medium text-[#2d6a4f] dark:text-[#74c69d] flex items-center gap-1.5"
+              className="text-xs font-medium text-[#2d6a4f] dark:text-[#74c69d] flex items-center gap-1.5 px-3 py-1.5"
             >
               <Truck className="w-3.5 h-3.5" />
               <span>Track Orders</span>

@@ -76,6 +76,7 @@ export interface Profile {
   full_name: string;
   email: string;
   phone: string;
+  role?: 'admin' | 'customer';
   avatar_url?: string;
   created_at: string;
   updated_at?: string;
@@ -173,6 +174,25 @@ export interface ProductFilter {
   searchQuery: string;
 }
 
+export interface HeroSlideBanner {
+  id: string;
+  imageUrl: string;
+  imageAlt?: string;
+  headlineLine1?: string;
+  headlineLine2?: string;
+  subheadline?: string;
+  showTextOverlay?: boolean;
+  textPosition?: 'left' | 'center' | 'right';
+  showPrimaryButton?: boolean;
+  primaryBtnText?: string;
+  primaryTarget?: string;
+  showSecondaryButton?: boolean;
+  secondaryBtnText?: string;
+  secondaryTarget?: string;
+  overlayDarkness?: 'none' | 'subtle' | 'medium' | 'gradient-left' | 'gradient-center';
+  isActive?: boolean;
+}
+
 export interface HeroBannerConfig {
   templateId: 'modern-organic' | 'lush-nursery' | 'monsoon-harvest' | 'urban-botanical' | 'custom';
   badgeText: string;
@@ -227,6 +247,7 @@ export interface SiteSettings {
   footerBgMode?: 'dark' | 'white' | 'light-green' | 'emerald'; // Lowest part / footer background replacement
   footerBgCustom?: string;
   heroBanner: HeroBannerConfig;
+  heroBanners?: HeroSlideBanner[]; // Dynamic multi-banner carousel list
   sampleVideos: VideoItem[];
 }
 

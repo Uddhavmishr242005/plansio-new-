@@ -12,16 +12,19 @@ import {
   Sprout
 } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
+import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 
 export const Footer: React.FC = () => {
   const { setActiveTab, setFilters } = useShop();
+  const { isAdmin } = useAuth();
   const { settings } = useSiteSettings();
 
   const handleCategoryNav = (catId: string) => {
     setFilters(prev => ({ ...prev, category: catId, searchQuery: '' }));
-    setActiveTab('shop');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setActiveTab('home');
+    const el = document.getElementById('home-all-products');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
   const isWhiteBg = settings.footerBgMode === 'white';
@@ -232,19 +235,6 @@ export const Footer: React.FC = () => {
             <p className={`text-xs ${subtextClass} leading-relaxed max-w-sm`}>
               {settings.brandName || 'PLANSIO'} is India's premium organic gardening brand. We manufacture 100% pure vermicompost, nurture disease-resistant foliage plants, and formulate zero-chemical bio-fertilizers.
             </p>
-
-            <div className="pt-2 flex items-center gap-2">
-              <button
-                onClick={() => {
-                  setActiveTab('admin');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className={`text-xs ${isWhiteBg || isLightGreenBg ? 'text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border-emerald-200' : 'text-emerald-400 hover:text-emerald-300 bg-emerald-950/60 border-emerald-800/40'} font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-lg border`}
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Admin Console</span>
-              </button>
-            </div>
           </div>
 
           {/* Categories */}
@@ -254,28 +244,33 @@ export const Footer: React.FC = () => {
             </h4>
             <ul className={`space-y-2 text-xs ${subtextClass}`}>
               <li>
-                <button onClick={() => handleCategoryNav('cat-1')} className={`${linkHoverClass} transition-colors`}>
-                  Gold Vermicompost
+                <button onClick={() => handleCategoryNav('cat-4')} className={`${linkHoverClass} transition-colors`}>
+                  100% Pure Vermicompost
                 </button>
               </li>
               <li>
-                <button onClick={() => handleCategoryNav('cat-3')} className={`${linkHoverClass} transition-colors`}>
-                  Indoor Air Purifiers
+                <button onClick={() => handleCategoryNav('cat-1')} className={`${linkHoverClass} transition-colors`}>
+                  Indoor Foliage Plants
                 </button>
               </li>
               <li>
                 <button onClick={() => handleCategoryNav('cat-2')} className={`${linkHoverClass} transition-colors`}>
-                  Organic Bio-Fertilizers
+                  Outdoor Plants
                 </button>
               </li>
               <li>
-                <button onClick={() => handleCategoryNav('cat-4')} className={`${linkHoverClass} transition-colors`}>
-                  Outdoor Garden Greens
+                <button onClick={() => handleCategoryNav('cat-3')} className={`${linkHoverClass} transition-colors`}>
+                  Pots & Planters
+                </button>
+              </li>
+              <li>
+                <button onClick={() => handleCategoryNav('cat-5')} className={`${linkHoverClass} transition-colors`}>
+                  Seeds & Soil Mixes
                 </button>
               </li>
               <li>
                 <button onClick={() => handleCategoryNav('cat-6')} className={`${linkHoverClass} transition-colors`}>
-                  Pruning & Garden Tools
+                  Plant Care & Tools
                 </button>
               </li>
             </ul>
@@ -343,6 +338,17 @@ export const Footer: React.FC = () => {
             <span className="hover:text-gray-400 cursor-pointer">Privacy Policy</span>
             <span className="hover:text-gray-400 cursor-pointer">Terms of Service</span>
             <span className="hover:text-gray-400 cursor-pointer">Shipping & Refunds</span>
+            {isAdmin && (
+              <button
+                onClick={() => {
+                  setActiveTab('admin');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="text-emerald-700 dark:text-emerald-400 hover:underline text-[11px] font-semibold transition-colors cursor-pointer"
+              >
+                Merchant Portal
+              </button>
+            )}
           </div>
         </div>
       </div>

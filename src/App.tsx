@@ -24,7 +24,7 @@ const AppContent: React.FC = () => {
   const { activeTab, activeQuickViewProduct, setActiveQuickViewProduct } = useShop();
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f6fbf4] dark:bg-[#0e1710] text-[#1f2d1f] dark:text-[#eaf2eb] transition-colors duration-200">
+    <div className="min-h-screen flex flex-col bg-white dark:bg-[#0e1710] text-[#111827] dark:text-[#eaf2eb] transition-colors duration-200">
       
       {/* Top Navigation */}
       <Navbar />

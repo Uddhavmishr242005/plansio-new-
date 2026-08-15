@@ -35,10 +35,22 @@ const setLocalDb = <T>(key: string, value: T): void => {
 
 // Initialize seed data in local storage sandbox if not present
 const initializeSandboxData = () => {
-  if (!localStorage.getItem(DB_STORAGE_PREFIX + 'products')) {
+  const existingProds = getLocalDb<Product[]>('products', []);
+  if (!existingProds || existingProds.length === 0) {
     setLocalDb('products', INITIAL_PRODUCTS);
+  } else {
+    // Ensure all products have authentic 0 ratings if no real user reviews were submitted
+    const sanitized = existingProds.map(p => ({
+      ...p,
+      rating: p.reviews && p.reviews.length > 0 ? p.rating : 0,
+      review_count: p.reviews ? p.reviews.length : 0,
+      reviews: p.reviews || []
+    }));
+    setLocalDb('products', sanitized);
   }
-  if (!localStorage.getItem(DB_STORAGE_PREFIX + 'categories')) {
+  // Sync categories
+  const storedCats = getLocalDb<Category[]>('categories', []);
+  if (!storedCats || storedCats.length === 0 || !storedCats.some(c => c.slug === 'vermicompost')) {
     setLocalDb('categories', INITIAL_CATEGORIES);
   }
   if (!localStorage.getItem(DB_STORAGE_PREFIX + 'cart_items')) {
@@ -136,6 +148,33 @@ export const getCategories = async (): Promise<Category[]> => {
     }
   }
   return getLocalDb<Category[]>('categories', INITIAL_CATEGORIES);
+};
+
+export const updateCategory = async (
+  categoryId: string,
+  updates: Partial<Category>
+): Promise<Category | null> => {
+  const categories = getLocalDb<Category[]>('categories', INITIAL_CATEGORIES);
+  const index = categories.findIndex(c => c.id === categoryId || c.slug === categoryId);
+  if (index === -1) return null;
+
+  categories[index] = {
+    ...categories[index],
+    ...updates
+  };
+
+  setLocalDb('categories', categories);
+
+  if (isLiveSupabaseConfigured() && isValidUUID(categoryId)) {
+    try {
+      const supabase = getSupabaseClient();
+      await supabase.from('categories').update(updates).eq('id', categoryId);
+    } catch (err) {
+      console.warn('Supabase updateCategory error:', err);
+    }
+  }
+
+  return categories[index];
 };
 
 // ==========================================
@@ -1057,4 +1096,119 @@ export const createReview = async (
   }
 
   return newReview;
+};
+
+export const resetAllProductRatings = async (): Promise<Product[]> => {
+  const products = getLocalDb<Product[]>('products', INITIAL_PRODUCTS);
+  const resetProducts = products.map(p => ({
+    ...p,
+    rating: 0,
+    review_count: 0,
+    reviews: []
+  }));
+  setLocalDb('products', resetProducts);
+
+  if (isLiveSupabaseConfigured()) {
+    try {
+      const supabase = getSupabaseClient();
+      await supabase.from('reviews').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('products').update({ rating: 0, review_count: 0 }).neq('id', '00000000-0000-0000-0000-000000000000');
+    } catch (err) {
+      console.warn('Supabase resetAllProductRatings error:', err);
+    }
+  }
+
+  return resetProducts;
+};
+
+export const getAllReviews = async (): Promise<Review[]> => {
+  const products = getLocalDb<Product[]>('products', INITIAL_PRODUCTS);
+  const allReviews: Review[] = [];
+  products.forEach(p => {
+    if (p.reviews && p.reviews.length > 0) {
+      allReviews.push(...p.reviews);
+    }
+  });
+  return allReviews.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+};
+
+export const deleteReview = async (reviewId: string, productId?: string): Promise<boolean> => {
+  const products = getLocalDb<Product[]>('products', INITIAL_PRODUCTS);
+  let modified = false;
+
+  products.forEach(p => {
+    if (p.reviews && p.reviews.some(r => r.id === reviewId)) {
+      p.reviews = p.reviews.filter(r => r.id !== reviewId);
+      p.review_count = p.reviews.length;
+      if (p.reviews.length > 0) {
+        const total = p.reviews.reduce((acc, r) => acc + r.rating, 0);
+        p.rating = Number((total / p.reviews.length).toFixed(1));
+      } else {
+        p.rating = 0;
+      }
+      modified = true;
+    }
+  });
+
+  if (modified) {
+    setLocalDb('products', products);
+  }
+
+  if (isLiveSupabaseConfigured()) {
+    try {
+      const supabase = getSupabaseClient();
+      await supabase.from('reviews').delete().eq('id', reviewId);
+    } catch (err) {
+      console.warn('Supabase deleteReview error:', err);
+    }
+  }
+
+  return true;
+};
+
+export const addCustomProduct = async (productData: Partial<Product>): Promise<Product> => {
+  const products = getLocalDb<Product[]>('products', INITIAL_PRODUCTS);
+  const newProduct: Product = {
+    id: 'prod-' + Math.random().toString(36).substring(2, 9),
+    name: productData.name || 'New Product',
+    slug: (productData.name || 'new-product').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    category_id: productData.category_id || 'cat-1',
+    description: productData.description || '',
+    short_description: productData.short_description || productData.description?.substring(0, 100) || '',
+    price: productData.price || 499,
+    compare_at_price: productData.compare_at_price || Math.round((productData.price || 499) * 1.3),
+    discount_percentage: productData.discount_percentage || 0,
+    sku: productData.sku || 'PLN-' + Math.floor(1000 + Math.random() * 9000),
+    rating: 0,
+    review_count: 0,
+    featured: productData.featured || false,
+    bestseller: productData.bestseller || false,
+    is_active: productData.is_active !== false,
+    stock_quantity: productData.stock_quantity || 50,
+    variants: productData.variants || [],
+    images: productData.images || [
+      {
+        id: 'img-' + Math.random().toString(36).substring(2, 9),
+        product_id: '',
+        image_url: 'https://images.unsplash.com/photo-1545241047-6083a3684587?auto=format&fit=crop&w=800&q=80',
+        is_primary: true,
+        sort_order: 1,
+        created_at: new Date().toISOString()
+      }
+    ],
+    reviews: [],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  products.unshift(newProduct);
+  setLocalDb('products', products);
+  return newProduct;
+};
+
+export const deleteProduct = async (productId: string): Promise<boolean> => {
+  const products = getLocalDb<Product[]>('products', INITIAL_PRODUCTS);
+  const filtered = products.filter(p => p.id !== productId);
+  setLocalDb('products', filtered);
+  return true;
 };

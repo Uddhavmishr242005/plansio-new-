@@ -17,20 +17,28 @@ export const VideoShowcaseSection: React.FC = () => {
     : videos.filter(v => v.category === selectedCategory);
 
   return (
-    <section className="py-16 md:py-24 bg-[#f0f7ee] dark:bg-[#0b140d] border-t border-b border-[#e2ede0] dark:border-[#1c2e20] transition-colors duration-200">
+    <section className="py-16 md:py-24 bg-white dark:bg-[#0b140d] border-t border-b border-gray-100 dark:border-[#1c2e20] transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
+        {/* Lined Header for Video Section */}
+        <div className="relative flex items-center justify-center my-4 mb-8">
+          <div className="w-full border-t border-gray-200 dark:border-gray-800 absolute" />
+          <div className="relative bg-white dark:bg-[#0b140d] px-6 py-2 flex items-center gap-3">
+            <span className="w-2 h-2 rounded-full bg-emerald-600 dark:bg-emerald-400" />
+            <span className="text-xs sm:text-sm font-bold uppercase tracking-widest text-emerald-800 dark:text-emerald-300">
+              SAMPLE VIDEOS & REELS
+            </span>
+            <span className="w-2 h-2 rounded-full bg-emerald-600 dark:bg-emerald-400" />
+          </div>
+        </div>
+
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#d8f3dc] dark:bg-[#1b3824] text-[#1b4332] dark:text-[#95d5b2] text-xs font-bold tracking-wide">
-              <Video className="w-3.5 h-3.5" />
-              <span>Organic Farm & Botanical Masterclasses</span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-[#1b4332] dark:text-[#eaf2eb]">
-              Watch Real Farm & Plant Care Guides
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-gray-900 dark:text-[#eaf2eb]">
+              Watch Real Farm & Plant Care Videos
             </h2>
-            <p className="text-sm text-[#526352] dark:text-[#a3b8a6] max-w-2xl">
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 max-w-2xl">
               Authentic walkthroughs demonstrating our earthworm vermiculture screening process, repotting techniques, and natural pest protection recipes.
             </p>
           </div>
@@ -42,10 +50,10 @@ export const VideoShowcaseSection: React.FC = () => {
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                     selectedCategory === cat
-                      ? 'bg-[#1b4332] text-white shadow-sm dark:bg-[#40916c]'
-                      : 'bg-white dark:bg-[#142217] text-[#1f2d1f] dark:text-[#eaf2eb] border border-[#e2ede0] dark:border-[#243828] hover:bg-[#e2ede0]/60'
+                      ? 'bg-emerald-800 text-white shadow-sm dark:bg-[#40916c]'
+                      : 'bg-white dark:bg-[#142217] text-gray-700 dark:text-[#eaf2eb] border border-gray-200 dark:border-[#243828] hover:bg-gray-50'
                   }`}
                 >
                   {cat}
@@ -57,10 +65,10 @@ export const VideoShowcaseSection: React.FC = () => {
 
         {/* Video Cards Grid */}
         {filteredVideos.length === 0 ? (
-          <div className="text-center py-12 bg-white dark:bg-[#142217] rounded-3xl border border-[#e2ede0] dark:border-[#243828] p-8">
-            <Video className="w-12 h-12 text-[#2d6a4f] mx-auto mb-3 opacity-60" />
-            <p className="text-sm font-semibold text-[#1b4332] dark:text-[#eaf2eb]">No videos published in this category.</p>
-            <p className="text-xs text-[#526352] dark:text-[#a3b8a6] mt-1">Upload and manage sample videos directly in the Admin Panel.</p>
+          <div className="text-center py-12 bg-white dark:bg-[#142217] rounded-3xl border border-gray-200 dark:border-[#243828] p-8">
+            <Video className="w-12 h-12 text-emerald-700 mx-auto mb-3 opacity-60" />
+            <p className="text-sm font-semibold text-gray-900 dark:text-[#eaf2eb]">No videos published in this category.</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload and manage sample videos directly in the Admin Panel.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -68,7 +76,7 @@ export const VideoShowcaseSection: React.FC = () => {
               <div
                 key={vid.id}
                 onClick={() => setActiveVideo(vid)}
-                className="group cursor-pointer bg-white dark:bg-[#142217] rounded-2xl overflow-hidden border border-[#e2ede0] dark:border-[#243828] shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col"
+                className="group cursor-pointer bg-white dark:bg-[#142217] rounded-2xl overflow-hidden border border-gray-200 dark:border-[#243828] shadow-xs hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col"
               >
                 {/* Thumbnail with Play Overlay */}
                 <div className="relative aspect-video w-full overflow-hidden bg-black/10">

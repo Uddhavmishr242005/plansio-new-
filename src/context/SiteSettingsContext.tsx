@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { HeroBannerConfig, SiteSettings, VideoItem, Review } from '../types/database';
+import { HeroBannerConfig, HeroSlideBanner, SiteSettings, VideoItem, Review } from '../types/database';
 import { useToast } from './ToastContext';
 
 export interface HeroTemplatePreset {
@@ -96,6 +96,63 @@ export const HERO_TEMPLATES: HeroTemplatePreset[] = [
   }
 ];
 
+export const DEFAULT_HERO_BANNERS: HeroSlideBanner[] = [
+  {
+    id: 'banner-1',
+    imageUrl: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&w=1800&q=85',
+    imageAlt: 'Pure Organic Vermicompost & Healthy Nursery Plants',
+    headlineLine1: 'Grow Better.',
+    headlineLine2: 'Live Greener.',
+    subheadline: 'Premium vermicompost, healthy nursery plants, cold-pressed organic bio-fertilizers, and everything you need to nurture a thriving urban paradise.',
+    showTextOverlay: true,
+    textPosition: 'left',
+    showPrimaryButton: true,
+    primaryBtnText: 'SHOP NOW',
+    primaryTarget: 'shop',
+    showSecondaryButton: true,
+    secondaryBtnText: 'EXPLORE PLANTS',
+    secondaryTarget: 'cat-1',
+    overlayDarkness: 'gradient-left',
+    isActive: true
+  },
+  {
+    id: 'banner-2',
+    imageUrl: 'https://images.unsplash.com/photo-1545241047-6083a3684587?auto=format&fit=crop&w=1800&q=85',
+    imageAlt: 'Lush potted botanical monstera and indoor home greenery',
+    headlineLine1: 'Bring Living Nature',
+    headlineLine2: 'Into Your Home',
+    subheadline: 'Hand-nurtured plants, handcrafted ceramic planters, and acclimated indoor greens delivered safely to your doorstep.',
+    showTextOverlay: true,
+    textPosition: 'left',
+    showPrimaryButton: true,
+    primaryBtnText: 'VIEW PLANTS',
+    primaryTarget: 'cat-1',
+    showSecondaryButton: true,
+    secondaryBtnText: 'PLANT CARE',
+    secondaryTarget: 'cat-6',
+    overlayDarkness: 'gradient-left',
+    isActive: true
+  },
+  {
+    id: 'banner-3',
+    imageUrl: 'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1800&q=85',
+    imageAlt: 'Modern ceramic planters and artisanal aesthetic garden pots',
+    headlineLine1: 'Pure Vermicompost',
+    headlineLine2: '& Organic Soils',
+    subheadline: '100% pure organic earthworm castings rich in bio-enzymes, mycorrhizae and vital micro-nutrients.',
+    showTextOverlay: true,
+    textPosition: 'left',
+    showPrimaryButton: true,
+    primaryBtnText: 'SHOP VERMICOMPOST',
+    primaryTarget: 'cat-4',
+    showSecondaryButton: true,
+    secondaryBtnText: 'EXPLORE PLANTERS',
+    secondaryTarget: 'cat-3',
+    overlayDarkness: 'gradient-left',
+    isActive: true
+  }
+];
+
 export const INITIAL_REALISTIC_VIDEOS: VideoItem[] = [
   {
     id: 'vid-1',
@@ -171,6 +228,7 @@ const DEFAULT_SITE_SETTINGS: SiteSettings = {
     featureTag2: 'Fresh Nursery Direct',
     featureTag3: 'Express Safe Dispatch'
   },
+  heroBanners: DEFAULT_HERO_BANNERS,
   sampleVideos: INITIAL_REALISTIC_VIDEOS
 };
 
@@ -179,6 +237,17 @@ interface SiteSettingsContextType {
   updateSettings: (newSettings: Partial<SiteSettings>) => void;
   updateHeroBanner: (heroConfig: Partial<HeroBannerConfig>) => void;
   applyHeroTemplate: (templateId: HeroBannerConfig['templateId']) => void;
+  
+  // Multi-Banner Management
+  heroBanners: HeroSlideBanner[];
+  addHeroBanner: (banner: Omit<HeroSlideBanner, 'id'>) => void;
+  updateHeroBannerSlide: (id: string, banner: Partial<HeroSlideBanner>) => void;
+  deleteHeroBannerSlide: (id: string) => void;
+  replaceHeroBannerImage: (id: string, imageUrl: string) => void;
+  reorderHeroBanners: (newBannersOrFromIndex: HeroSlideBanner[] | number, toIndex?: number) => void;
+  duplicateHeroBannerSlide: (id: string) => void;
+  resetHeroBannersToDefault: () => void;
+
   setCustomLogo: (logoUrlOrBase64: string | null) => void;
   setLogoSize: (height: number, maxWidth?: number) => void;
   setLogoPosition: (posX: number, posY?: number) => void;
@@ -208,10 +277,15 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const { showToast } = useToast();
   
   const [settings, setSettings] = useState<SiteSettings>(() => {
-    const saved = localStorage.getItem('plansio_site_settings_v2');
+    const saved = localStorage.getItem('plansio_site_settings_v3');
     if (saved) {
       try {
-        return { ...DEFAULT_SITE_SETTINGS, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        return {
+          ...DEFAULT_SITE_SETTINGS,
+          ...parsed,
+          heroBanners: parsed.heroBanners && parsed.heroBanners.length > 0 ? parsed.heroBanners : DEFAULT_HERO_BANNERS
+        };
       } catch (err) {
         console.error('Error loading site settings:', err);
       }
@@ -233,12 +307,16 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   });
 
   useEffect(() => {
-    localStorage.setItem('plansio_site_settings_v2', JSON.stringify(settings));
+    localStorage.setItem('plansio_site_settings_v3', JSON.stringify(settings));
   }, [settings]);
 
   useEffect(() => {
     localStorage.setItem('plansio_real_customer_reviews', JSON.stringify(realReviews));
   }, [realReviews]);
+
+  const heroBanners = settings.heroBanners && settings.heroBanners.length > 0
+    ? settings.heroBanners
+    : DEFAULT_HERO_BANNERS;
 
   const updateSettings = (newSettings: Partial<SiteSettings>) => {
     setSettings(prev => ({ ...prev, ...newSettings }));
@@ -268,6 +346,98 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
     }));
     showToast('Hero Template Applied', 'success', `Loaded "${template.name}" template.`);
+  };
+
+  // Multi-banner dynamic actions
+  const addHeroBanner = (bannerData: Omit<HeroSlideBanner, 'id'>) => {
+    const newBanner: HeroSlideBanner = {
+      ...bannerData,
+      id: 'banner-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+      isActive: bannerData.isActive ?? true,
+      showTextOverlay: bannerData.showTextOverlay ?? true,
+      showPrimaryButton: bannerData.showPrimaryButton ?? true,
+      showSecondaryButton: bannerData.showSecondaryButton ?? true
+    };
+    setSettings(prev => ({
+      ...prev,
+      heroBanners: [...(prev.heroBanners || DEFAULT_HERO_BANNERS), newBanner]
+    }));
+    showToast('Banner Added', 'success', `New banner slide added (${(settings.heroBanners?.length || 0) + 1} total).`);
+  };
+
+  const updateHeroBannerSlide = (id: string, updated: Partial<HeroSlideBanner>) => {
+    setSettings(prev => ({
+      ...prev,
+      heroBanners: (prev.heroBanners || DEFAULT_HERO_BANNERS).map(b => b.id === id ? { ...b, ...updated } : b)
+    }));
+    showToast('Banner Updated', 'success', 'Slide settings saved.');
+  };
+
+  const deleteHeroBannerSlide = (id: string) => {
+    const currentList = settings.heroBanners || DEFAULT_HERO_BANNERS;
+    if (currentList.length <= 1) {
+      showToast('Action Blocked', 'error', 'At least one hero banner must remain active.');
+      return;
+    }
+    setSettings(prev => ({
+      ...prev,
+      heroBanners: (prev.heroBanners || DEFAULT_HERO_BANNERS).filter(b => b.id !== id)
+    }));
+    showToast('Banner Deleted', 'info', 'Banner removed from carousel.');
+  };
+
+  const replaceHeroBannerImage = (id: string, imageUrl: string) => {
+    setSettings(prev => ({
+      ...prev,
+      heroBanners: (prev.heroBanners || DEFAULT_HERO_BANNERS).map(b => b.id === id ? { ...b, imageUrl } : b)
+    }));
+    showToast('Image Replaced', 'success', 'New banner image applied.');
+  };
+
+  const reorderHeroBanners = (newBannersOrFromIndex: HeroSlideBanner[] | number, toIndex?: number) => {
+    if (Array.isArray(newBannersOrFromIndex)) {
+      setSettings(prev => ({
+        ...prev,
+        heroBanners: newBannersOrFromIndex
+      }));
+    } else if (typeof newBannersOrFromIndex === 'number' && typeof toIndex === 'number') {
+      setSettings(prev => {
+        const list = [...(prev.heroBanners || DEFAULT_HERO_BANNERS)];
+        if (newBannersOrFromIndex < 0 || newBannersOrFromIndex >= list.length || toIndex < 0 || toIndex >= list.length) {
+          return prev;
+        }
+        const [moved] = list.splice(newBannersOrFromIndex, 1);
+        list.splice(toIndex, 0, moved);
+        return {
+          ...prev,
+          heroBanners: list
+        };
+      });
+    }
+    showToast('Order Updated', 'success', 'Banner carousel sequence updated.');
+  };
+
+  const duplicateHeroBannerSlide = (id: string) => {
+    const banner = (settings.heroBanners || DEFAULT_HERO_BANNERS).find(b => b.id === id);
+    if (!banner) return;
+    const duplicated: HeroSlideBanner = {
+      ...banner,
+      id: 'banner-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+      headlineLine1: banner.headlineLine1 ? `${banner.headlineLine1} (Copy)` : ''
+    };
+    setSettings(prev => ({
+      ...prev,
+      heroBanners: [...(prev.heroBanners || DEFAULT_HERO_BANNERS), duplicated]
+    }));
+    showToast('Banner Duplicated', 'success', 'Slide cloned successfully.');
+  };
+
+  const resetHeroBannersToDefault = () => {
+    setSettings(prev => ({
+      ...prev,
+      heroBanners: DEFAULT_HERO_BANNERS
+    }));
+    showToast('Reset to Default Banners', 'info', 'Restored 3 signature default hero banners.');
   };
 
   const setCustomLogo = (logoUrlOrBase64: string | null) => {
@@ -427,6 +597,14 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
         updateSettings,
         updateHeroBanner,
         applyHeroTemplate,
+        heroBanners,
+        addHeroBanner,
+        updateHeroBannerSlide,
+        deleteHeroBannerSlide,
+        replaceHeroBannerImage,
+        reorderHeroBanners,
+        duplicateHeroBannerSlide,
+        resetHeroBannersToDefault,
         setCustomLogo,
         setLogoSize,
         setLogoPosition,
@@ -460,3 +638,4 @@ export const useSiteSettings = (): SiteSettingsContextType => {
   }
   return context;
 };
+

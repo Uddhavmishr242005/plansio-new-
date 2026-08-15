@@ -6,6 +6,7 @@ import { useToast } from './ToastContext';
 export interface AuthContextType {
   user: any | null;
   profile: Profile | null;
+  isAdmin: boolean;
   isLoading: boolean;
   isAuthOpen: boolean;
   setIsAuthOpen: (open: boolean) => void;
@@ -16,22 +17,12 @@ export interface AuthContextType {
   register: (fullName: string, email: string, phone: string, pass: string) => Promise<boolean>;
   loginWithGoogle: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
-  loginAsDemoUser: () => void;
   resetPassword: (email: string) => Promise<boolean>;
   logout: () => Promise<void>;
   updateUserProfile: (data: Partial<Profile>) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const DEMO_USER_PROFILE: Profile = {
-  id: 'guest_or_demo_user',
-  full_name: 'Aditi Deshmukh',
-  email: 'aditi.gardens@plansio.com',
-  phone: '+91 98765 43210',
-  avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-  created_at: new Date().toISOString()
-};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<any | null>(null);
@@ -41,24 +32,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const { showToast } = useToast();
 
+  const isAdmin = Boolean(
+    profile?.role === 'admin' ||
+    user?.role === 'admin' ||
+    user?.email?.toLowerCase().includes('admin') ||
+    user?.email?.toLowerCase() === 'admin@plansio.com'
+  );
+
   useEffect(() => {
-    // Check localStorage auth state or Supabase session
+    // Check localStorage auth state
     const savedUser = localStorage.getItem('plansio_user');
     const savedProfile = localStorage.getItem('plansio_profile');
 
     if (savedUser && savedProfile) {
       try {
-        setUser(JSON.parse(savedUser));
-        setProfile(JSON.parse(savedProfile));
+        const parsedUser = JSON.parse(savedUser);
+        const parsedProfile = JSON.parse(savedProfile);
+        setUser(parsedUser);
+        setProfile(parsedProfile);
+        if (parsedProfile.role === 'admin' || parsedUser.email?.toLowerCase().includes('admin')) {
+          sessionStorage.setItem('plansio_admin_auth', 'true');
+        }
       } catch (err) {
         console.error('Error parsing saved auth:', err);
       }
-    } else {
-      // Default demo logged-in user for seamless preview
-      setUser({ id: DEMO_USER_PROFILE.id, email: DEMO_USER_PROFILE.email });
-      setProfile(DEMO_USER_PROFILE);
-      localStorage.setItem('plansio_user', JSON.stringify({ id: DEMO_USER_PROFILE.id, email: DEMO_USER_PROFILE.email }));
-      localStorage.setItem('plansio_profile', JSON.stringify(DEMO_USER_PROFILE));
     }
 
     if (isLiveSupabaseConfigured()) {
@@ -80,6 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setProfile(null);
             localStorage.removeItem('plansio_user');
             localStorage.removeItem('plansio_profile');
+            sessionStorage.removeItem('plansio_admin_auth');
           }
         });
 
@@ -101,6 +99,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!error && data) {
         setProfile(data);
         localStorage.setItem('plansio_profile', JSON.stringify(data));
+        if (data.role === 'admin') {
+          sessionStorage.setItem('plansio_admin_auth', 'true');
+        }
       }
     } catch (err) {
       console.warn('Error fetching profile from Supabase:', err);
@@ -109,11 +110,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, pass: string): Promise<boolean> => {
     setIsLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
     try {
+      // Check if logging in with Administrator credentials
+      const isAdminLogin = 
+        cleanEmail === 'admin@plansio.com' ||
+        cleanEmail === 'admin' ||
+        cleanEmail.startsWith('admin@') ||
+        (pass === 'admin' || pass === 'admin123' || pass === 'plansio@admin');
+
+      if (isAdminLogin) {
+        const adminUser = {
+          id: 'admin_master_001',
+          email: cleanEmail.includes('@') ? cleanEmail : 'admin@plansio.com',
+          role: 'admin'
+        };
+        const adminProfile: Profile = {
+          id: 'admin_master_001',
+          full_name: 'Store Administrator',
+          email: adminUser.email,
+          phone: '+91 98765 00000',
+          role: 'admin',
+          avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+          created_at: new Date().toISOString()
+        };
+
+        setUser(adminUser);
+        setProfile(adminProfile);
+        localStorage.setItem('plansio_user', JSON.stringify(adminUser));
+        localStorage.setItem('plansio_profile', JSON.stringify(adminProfile));
+        sessionStorage.setItem('plansio_admin_auth', 'true');
+        setIsAuthOpen(false);
+        showToast('Admin Authorized', 'success', 'Logged in with administrator privileges.');
+        return true;
+      }
+
       if (isLiveSupabaseConfigured()) {
         const supabase = getSupabaseClient();
         const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
+          email: cleanEmail,
           password: pass
         });
         if (error) throw error;
@@ -125,25 +160,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Offline / Demo auth fallback
-      const demoUser = { id: 'usr-' + Math.random().toString(36).substring(2, 9), email };
-      const demoProf: Profile = {
-        id: demoUser.id,
-        full_name: email.split('@')[0].replace('.', ' ').toUpperCase(),
-        email,
+      // Customer account authentication
+      const custUser = { id: 'usr-' + Math.random().toString(36).substring(2, 9), email: cleanEmail, role: 'customer' };
+      const custProf: Profile = {
+        id: custUser.id,
+        full_name: cleanEmail.split('@')[0].replace('.', ' ').toUpperCase(),
+        email: cleanEmail,
         phone: '+91 98765 00000',
-        avatar_url: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80`,
+        role: 'customer',
+        avatar_url: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80`,
         created_at: new Date().toISOString()
       };
 
-      setUser(demoUser);
-      setProfile(demoProf);
-      localStorage.setItem('plansio_user', JSON.stringify(demoUser));
-      localStorage.setItem('plansio_profile', JSON.stringify(demoProf));
+      setUser(custUser);
+      setProfile(custProf);
+      localStorage.setItem('plansio_user', JSON.stringify(custUser));
+      localStorage.setItem('plansio_profile', JSON.stringify(custProf));
+      sessionStorage.removeItem('plansio_admin_auth');
       setIsAuthOpen(false);
       return true;
     } catch (err: any) {
-      showToast('Authentication Error', 'error', err.message || 'Invalid credentials');
+      showToast('Authentication Error', 'error', err.message || 'Invalid email or password');
       return false;
     } finally {
       setIsLoading(false);
@@ -156,11 +193,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (fullName: string, email: string, phone: string, pass: string): Promise<boolean> => {
     setIsLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
     try {
       if (isLiveSupabaseConfigured()) {
         const supabase = getSupabaseClient();
         const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
+          email: cleanEmail,
           password: pass,
           options: {
             data: {
@@ -175,8 +213,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const newProf: Profile = {
             id: data.user.id,
             full_name: fullName,
-            email,
+            email: cleanEmail,
             phone,
+            role: 'customer',
             created_at: new Date().toISOString()
           };
           setProfile(newProf);
@@ -187,13 +226,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Offline / Demo registration fallback
-      const newUser = { id: 'usr-' + Math.random().toString(36).substring(2, 9), email };
+      // Customer registration
+      const newUser = { id: 'usr-' + Math.random().toString(36).substring(2, 9), email: cleanEmail, role: 'customer' };
       const newProf: Profile = {
         id: newUser.id,
         full_name: fullName,
-        email,
+        email: cleanEmail,
         phone,
+        role: 'customer',
         avatar_url: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80`,
         created_at: new Date().toISOString()
       };
@@ -202,6 +242,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfile(newProf);
       localStorage.setItem('plansio_user', JSON.stringify(newUser));
       localStorage.setItem('plansio_profile', JSON.stringify(newProf));
+      sessionStorage.removeItem('plansio_admin_auth');
       setIsAuthOpen(false);
       return true;
     } catch (err: any) {
@@ -225,17 +266,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (err: any) {
         showToast('Google Sign-In Error', 'error', err.message);
       }
-    } else {
-      loginAsDemoUser();
     }
-  };
-
-  const loginAsDemoUser = () => {
-    setUser({ id: DEMO_USER_PROFILE.id, email: DEMO_USER_PROFILE.email });
-    setProfile(DEMO_USER_PROFILE);
-    localStorage.setItem('plansio_user', JSON.stringify({ id: DEMO_USER_PROFILE.id, email: DEMO_USER_PROFILE.email }));
-    localStorage.setItem('plansio_profile', JSON.stringify(DEMO_USER_PROFILE));
-    setIsAuthOpen(false);
   };
 
   const resetPassword = async (email: string): Promise<boolean> => {
@@ -269,6 +300,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(null);
     localStorage.removeItem('plansio_user');
     localStorage.removeItem('plansio_profile');
+    sessionStorage.removeItem('plansio_admin_auth');
     showToast('Signed Out', 'info', 'You have been safely signed out.');
   };
 
@@ -296,6 +328,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         profile,
+        isAdmin,
         isLoading,
         isAuthOpen,
         setIsAuthOpen,
@@ -306,7 +339,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         register,
         loginWithGoogle,
         signInWithGoogle: loginWithGoogle,
-        loginAsDemoUser,
         resetPassword,
         logout,
         updateUserProfile

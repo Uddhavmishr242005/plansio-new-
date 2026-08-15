@@ -48,22 +48,41 @@ import {
   Sprout,
   Move,
   AlignLeft,
-  Paintbrush
+  Paintbrush,
+  Star,
+  MessageSquare,
+  FolderTree,
+  Tag,
+  ArrowUp,
+  ArrowDown,
+  EyeOff,
+  SlidersHorizontal,
+  FileImage
 } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useSiteSettings, HERO_TEMPLATES } from '../context/SiteSettingsContext';
-import { Order, OrderItem, OrderStatus, Product, ProductImage, PaymentStatus, PaymentMethod, VideoItem } from '../types/database';
+import { Order, OrderItem, OrderStatus, Product, ProductImage, PaymentStatus, PaymentMethod, VideoItem, Category, Review, HeroSlideBanner } from '../types/database';
 import * as api from '../services/api';
 import { isLiveSupabaseConfigured, getSupabaseClient, DEFAULT_SUPABASE_PROJECT_ID } from '../lib/supabase';
 import { SUPABASE_SQL_SCHEMA } from '../lib/sqlSchema';
 
 export const AdminPage: React.FC = () => {
   const { products, categories, fetchProducts } = useShop();
+  const { user, isAdmin, logout } = useAuth();
   const { showToast } = useToast();
   const {
     settings,
     updateSettings,
+    heroBanners,
+    addHeroBanner,
+    updateHeroBannerSlide,
+    deleteHeroBannerSlide,
+    replaceHeroBannerImage,
+    reorderHeroBanners,
+    duplicateHeroBannerSlide,
+    resetHeroBannersToDefault,
     updateHeroBanner,
     applyHeroTemplate,
     setCustomLogo,
@@ -91,7 +110,44 @@ export const AdminPage: React.FC = () => {
   const [authError, setAuthError] = useState('');
 
   // Active Admin Sub-tab
-  const [activeAdminTab, setActiveAdminTab] = useState<'orders' | 'products' | 'branding' | 'hero-studio' | 'videos' | 'supabase'>('branding');
+  const [activeAdminTab, setActiveAdminTab] = useState<'branding' | 'hero-studio' | 'categories' | 'products' | 'reviews' | 'orders' | 'videos' | 'supabase'>('branding');
+
+  // Multi-Banner Hero Studio State
+  const [selectedBannerId, setSelectedBannerId] = useState<string | null>(null);
+  const [isAddBannerModalOpen, setIsAddBannerModalOpen] = useState(false);
+  const bannerReplaceFileInputRef = useRef<HTMLInputElement>(null);
+  const bannerNewFileInputRef = useRef<HTMLInputElement>(null);
+  const [replacingBannerId, setReplacingBannerId] = useState<string | null>(null);
+  
+  const [newBannerForm, setNewBannerForm] = useState<Omit<HeroSlideBanner, 'id'>>({
+    imageUrl: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&w=1800&q=85',
+    imageAlt: '100% Organic Vermicompost & Nursery Living',
+    headlineLine1: 'Grow Naturally.',
+    headlineLine2: 'Pure Organic Compost',
+    subheadline: 'Enrich your home garden and indoor houseplants with organic living earthworm castings.',
+    showTextOverlay: true,
+    textPosition: 'left',
+    showPrimaryButton: true,
+    primaryBtnText: 'SHOP NOW',
+    primaryTarget: 'cat-4',
+    showSecondaryButton: true,
+    secondaryBtnText: 'VIEW PLANTS',
+    secondaryTarget: 'cat-1',
+    overlayDarkness: 'gradient-left',
+    isActive: true
+  });
+
+  // Categories Customization State
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [categoryPhotoUrl, setCategoryPhotoUrl] = useState('');
+  const [categoryName, setCategoryName] = useState('');
+  const [categoryDescription, setCategoryDescription] = useState('');
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const categoryFileRef = useRef<HTMLInputElement>(null);
+
+  // Customer Reviews & Ratings State
+  const [allReviews, setAllReviews] = useState<Review[]>([]);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
 
   // File Upload Ref for Logo
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -163,13 +219,15 @@ export const AdminPage: React.FC = () => {
   const [newImageUrl, setNewImageUrl] = useState('');
   
   const isLive = isLiveSupabaseConfigured();
+  const isActuallyAuthenticated = isAuthenticated || isAdmin;
 
-  // Load orders on authentication or tab switch
+  // Load orders and reviews on authentication
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isActuallyAuthenticated) {
       loadAllOrders();
+      loadReviews();
     }
-  }, [isAuthenticated]);
+  }, [isActuallyAuthenticated]);
 
   const handleAdminLogin = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -179,21 +237,136 @@ export const AdminPage: React.FC = () => {
       setAuthError('');
       showToast('Admin Access Granted', 'success', 'Welcome to PLANSIO Control Center');
     } else {
-      setAuthError('Invalid Admin PIN. Use admin123 or click One-Click Demo Access.');
+      setAuthError('Invalid Admin PIN. Please enter valid administrator credentials.');
     }
-  };
-
-  const handleDemoLogin = () => {
-    setIsAuthenticated(true);
-    sessionStorage.setItem('plansio_admin_auth', 'true');
-    setAuthError('');
-    showToast('Admin Access Granted', 'success', 'Demo Owner Mode Active');
   };
 
   const handleAdminLogout = () => {
     setIsAuthenticated(false);
     sessionStorage.removeItem('plansio_admin_auth');
+    if (isAdmin) {
+      logout();
+    }
     showToast('Logged Out', 'info', 'Admin session ended');
+  };
+
+  const loadReviews = async () => {
+    setIsLoadingReviews(true);
+    try {
+      const revs = await api.getAllReviews();
+      setAllReviews(revs);
+    } catch (err: any) {
+      console.error('Error fetching reviews:', err);
+    } finally {
+      setIsLoadingReviews(false);
+    }
+  };
+
+  const handleResetAllRatings = async () => {
+    if (!window.confirm('Reset all product ratings to 0.0 and clear review counts across the database?')) {
+      return;
+    }
+    try {
+      await api.resetAllProductRatings();
+      await fetchProducts();
+      await loadReviews();
+      showToast('Ratings Reset', 'success', 'All product ratings reset to 0.0');
+    } catch (err: any) {
+      showToast('Reset Failed', 'error', err.message || 'Could not reset ratings');
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: string, productId?: string) => {
+    if (!window.confirm('Are you sure you want to delete this review?')) return;
+    try {
+      await api.deleteReview(reviewId, productId);
+      await fetchProducts();
+      await loadReviews();
+      showToast('Review Deleted', 'info', 'Review has been removed');
+    } catch (err: any) {
+      showToast('Delete Failed', 'error', err.message || 'Could not delete review');
+    }
+  };
+
+  const openCategoryEdit = (cat: Category) => {
+    setEditingCategory(cat);
+    setCategoryPhotoUrl(cat.image_url || '');
+    setCategoryName(cat.name || '');
+    setCategoryDescription(cat.description || '');
+  };
+
+  const handleCategoryFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setCategoryPhotoUrl(event.target.result as string);
+        showToast('Photo Loaded', 'success', 'Category image loaded into preview');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCategory) return;
+    setIsSavingCategory(true);
+    try {
+      await api.updateCategory(editingCategory.id, {
+        name: categoryName.trim() || editingCategory.name,
+        description: categoryDescription.trim() || editingCategory.description,
+        image_url: categoryPhotoUrl.trim() || editingCategory.image_url
+      });
+      await fetchProducts();
+      showToast('Category Updated', 'success', `${categoryName || editingCategory.name} updated successfully`);
+      setEditingCategory(null);
+    } catch (err: any) {
+      showToast('Update Failed', 'error', err.message || 'Could not update category');
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
+
+  // -------------------------------------------------------------
+  // HERO BANNER HANDLERS
+  // -------------------------------------------------------------
+  const handleBannerReplaceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !replacingBannerId) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        replaceHeroBannerImage(replacingBannerId, event.target.result as string);
+        showToast('Banner Photo Updated', 'success', 'New image applied to the hero banner');
+        setReplacingBannerId(null);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleNewBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setNewBannerForm(prev => ({ ...prev, imageUrl: event.target.result as string }));
+        showToast('Banner Image Loaded', 'success', 'Image ready to be added as a hero banner slide');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCreateNewBanner = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBannerForm.imageUrl.trim()) {
+      showToast('Image Required', 'error', 'Please provide a valid image URL or upload a file for the banner');
+      return;
+    }
+    addHeroBanner(newBannerForm);
+    showToast('Banner Slide Created', 'success', 'New hero banner added to the homepage carousel');
+    setIsAddBannerModalOpen(false);
   };
 
   const loadAllOrders = async () => {
@@ -557,7 +730,7 @@ export const AdminPage: React.FC = () => {
   const deliveredOrdersCount = orders.filter(o => o.order_status === 'Delivered').length;
 
   // Render Login Gate if Not Authenticated
-  if (!isAuthenticated) {
+  if (!isActuallyAuthenticated) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-4 bg-[#f6fbf4] dark:bg-[#0e1710]">
         <div className="w-full max-w-md bg-white dark:bg-[#142217] rounded-3xl p-8 shadow-xl border border-[#e2ede0] dark:border-[#243828] text-center">
@@ -569,7 +742,7 @@ export const AdminPage: React.FC = () => {
             PLANSIO Admin Gate
           </h1>
           <p className="text-xs text-[#526352] dark:text-[#a3b8a6] mb-6">
-            Authorized management for live orders, products, and Supabase database.
+            Authorized management for live orders, products, and store settings.
           </p>
 
           {authError && (
@@ -605,17 +778,6 @@ export const AdminPage: React.FC = () => {
               <span>Unlock Admin Panel</span>
             </button>
           </form>
-
-          <div className="mt-6 pt-6 border-t border-[#e2ede0] dark:border-[#243828]">
-            <p className="text-[11px] text-gray-500 mb-3">Quick testing for workspace owner:</p>
-            <button
-              onClick={handleDemoLogin}
-              className="w-full py-2.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>One-Click Owner Access</span>
-            </button>
-          </div>
         </div>
       </div>
     );
@@ -674,20 +836,46 @@ export const AdminPage: React.FC = () => {
                 }`}
               >
                 <LayoutTemplate className="w-3.5 h-3.5" />
-                <span>Hero Studio</span>
+                <span>Hero Studio ({heroBanners?.length || 0})</span>
               </button>
 
               <button
-                id="admin-tab-videos"
-                onClick={() => setActiveAdminTab('videos')}
+                id="admin-tab-categories"
+                onClick={() => setActiveAdminTab('categories')}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                  activeAdminTab === 'videos'
+                  activeAdminTab === 'categories'
                     ? 'bg-[#1b4332] text-white shadow-sm dark:bg-[#40916c]'
                     : 'text-[#526352] dark:text-[#a3b8a6] hover:text-[#1b4332]'
                 }`}
               >
-                <Video className="w-3.5 h-3.5" />
-                <span>Videos ({settings.sampleVideos?.length || 0})</span>
+                <FolderTree className="w-3.5 h-3.5" />
+                <span>Categories & Photos ({categories.length})</span>
+              </button>
+
+              <button
+                id="admin-tab-products"
+                onClick={() => setActiveAdminTab('products')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  activeAdminTab === 'products'
+                    ? 'bg-[#1b4332] text-white shadow-sm dark:bg-[#40916c]'
+                    : 'text-[#526352] dark:text-[#a3b8a6] hover:text-[#1b4332]'
+                }`}
+              >
+                <DollarSign className="w-3.5 h-3.5" />
+                <span>Pricing & Catalog ({products.length})</span>
+              </button>
+
+              <button
+                id="admin-tab-reviews"
+                onClick={() => setActiveAdminTab('reviews')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  activeAdminTab === 'reviews'
+                    ? 'bg-[#1b4332] text-white shadow-sm dark:bg-[#40916c]'
+                    : 'text-[#526352] dark:text-[#a3b8a6] hover:text-[#1b4332]'
+                }`}
+              >
+                <Star className="w-3.5 h-3.5" />
+                <span>Reviews & Ratings ({allReviews.length})</span>
               </button>
 
               <button
@@ -704,16 +892,16 @@ export const AdminPage: React.FC = () => {
               </button>
 
               <button
-                id="admin-tab-products"
-                onClick={() => setActiveAdminTab('products')}
+                id="admin-tab-videos"
+                onClick={() => setActiveAdminTab('videos')}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                  activeAdminTab === 'products'
+                  activeAdminTab === 'videos'
                     ? 'bg-[#1b4332] text-white shadow-sm dark:bg-[#40916c]'
                     : 'text-[#526352] dark:text-[#a3b8a6] hover:text-[#1b4332]'
                 }`}
               >
-                <DollarSign className="w-3.5 h-3.5" />
-                <span>Pricing & Catalog</span>
+                <Video className="w-3.5 h-3.5" />
+                <span>Videos ({settings.sampleVideos?.length || 0})</span>
               </button>
 
               <button
@@ -2331,161 +2519,1101 @@ export const AdminPage: React.FC = () => {
         )}
 
         {/* ------------------------------------------------------------- */}
-        {/* TAB: HERO BANNER TEMPLATE STUDIO                              */}
+        {/* TAB: HERO BANNER MULTI-SLIDE CAROUSEL STUDIO                  */}
         {/* ------------------------------------------------------------- */}
         {activeAdminTab === 'hero-studio' && (
           <div className="space-y-6 animate-fade-in">
+            
+            {/* Hidden File Inputs for Banner Uploads */}
+            <input
+              type="file"
+              ref={bannerReplaceFileInputRef}
+              onChange={handleBannerReplaceUpload}
+              accept="image/*"
+              className="hidden"
+            />
+            <input
+              type="file"
+              ref={bannerNewFileInputRef}
+              onChange={handleNewBannerUpload}
+              accept="image/*"
+              className="hidden"
+            />
+
+            {/* Top Studio Header & Actions */}
+            <div className="bg-white dark:bg-[#142217] rounded-3xl p-6 sm:p-8 shadow-sm border border-[#e2ede0] dark:border-[#243828] space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#e2ede0] dark:border-[#243828]">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#1b4332] to-[#2d6a4f] text-white flex items-center justify-center shadow-md">
+                    <LayoutTemplate className="w-6 h-6 text-[#d8f3dc]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-xl font-bold text-[#1b4332] dark:text-[#eaf2eb]">
+                        Hero Carousel & Banner Studio
+                      </h2>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">
+                        {heroBanners.length} Slide{heroBanners.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#526352] dark:text-[#a3b8a6]">
+                      Manage unlimited full-frame hero banners. Add, replace photo, delete, reorder, customize text, or disable CTA buttons.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <button
+                    onClick={() => resetHeroBannersToDefault()}
+                    className="px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="Restore standard default nursery slides"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reset Defaults</span>
+                  </button>
+
+                  <button
+                    id="admin-add-hero-banner-btn"
+                    onClick={() => setIsAddBannerModalOpen(true)}
+                    className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add New Banner Slide</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Banner List Management */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">
+                    Homepage Slides Queue ({heroBanners.length})
+                  </h3>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Auto-cycles seamlessly with smooth fade on homepage
+                  </span>
+                </div>
+
+                {heroBanners.length === 0 ? (
+                  <div className="p-8 text-center border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-2xl space-y-3">
+                    <ImageIcon className="w-10 h-10 mx-auto text-gray-400" />
+                    <p className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
+                      No hero banners configured yet
+                    </p>
+                    <button
+                      onClick={() => setIsAddBannerModalOpen(true)}
+                      className="px-4 py-2 bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs"
+                    >
+                      Create First Banner
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {heroBanners.map((slide, index) => {
+                      const isEditing = selectedBannerId === slide.id;
+                      return (
+                        <div
+                          key={slide.id}
+                          className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
+                            slide.isActive === false
+                              ? 'opacity-60 bg-gray-50 dark:bg-[#0c140e] border-gray-200 dark:border-gray-800'
+                              : isEditing
+                              ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-500 shadow-md ring-1 ring-emerald-500'
+                              : 'bg-[#fbfdfb] dark:bg-[#0e1710] border-[#e2ede0] dark:border-[#243828] hover:border-emerald-300'
+                          }`}
+                        >
+                          {/* Banner Header Row */}
+                          <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                            
+                            {/* Slide Preview & Info */}
+                            <div className="flex items-center gap-4 min-w-0">
+                              {/* Slide Index Badge */}
+                              <div className="flex flex-col items-center justify-center w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 text-xs font-bold text-gray-700 dark:text-gray-300 shrink-0">
+                                #{index + 1}
+                              </div>
+
+                              {/* Thumbnail preview */}
+                              <div className="relative w-28 sm:w-36 h-16 sm:h-20 rounded-xl overflow-hidden bg-gray-900 shrink-0 border border-gray-200 dark:border-gray-700 group">
+                                <img
+                                  src={slide.imageUrl}
+                                  alt={slide.imageAlt || 'Slide image'}
+                                  className="w-full h-full object-cover object-center"
+                                />
+                                <button
+                                  onClick={() => {
+                                    setReplacingBannerId(slide.id);
+                                    bannerReplaceFileInputRef.current?.click();
+                                  }}
+                                  className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[10px] font-bold gap-1 cursor-pointer"
+                                  title="Upload new image from device"
+                                >
+                                  <Upload className="w-3.5 h-3.5" />
+                                  <span>Replace Photo</span>
+                                </button>
+                              </div>
+
+                              {/* Titles & Status */}
+                              <div className="min-w-0 space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-bold text-sm text-[#1b4332] dark:text-[#eaf2eb] truncate">
+                                    {slide.showTextOverlay === false
+                                      ? '🖼️ Pure Graphic Banner (No Text Overlay)'
+                                      : `${slide.headlineLine1 || ''} ${slide.headlineLine2 || ''}`.trim() || 'Untitled Banner'}
+                                  </h4>
+                                  {slide.isActive === false && (
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                      Hidden
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">
+                                  {slide.subheadline || 'Click Edit to configure headline, subheadline, buttons & links'}
+                                </p>
+                                <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                                  {slide.showPrimaryButton !== false && slide.primaryBtnText && (
+                                    <span className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300">
+                                      Btn 1: {slide.primaryBtnText}
+                                    </span>
+                                  )}
+                                  {slide.showSecondaryButton !== false && slide.secondaryBtnText && (
+                                    <span className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300">
+                                      Btn 2: {slide.secondaryBtnText}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex flex-wrap items-center gap-1.5 shrink-0 self-end lg:self-center">
+                              
+                              {/* Reorder Up */}
+                              <button
+                                disabled={index === 0}
+                                onClick={() => reorderHeroBanners(index, index - 1)}
+                                className="p-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                                title="Move Slide Up"
+                              >
+                                <ArrowUp className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Reorder Down */}
+                              <button
+                                disabled={index === heroBanners.length - 1}
+                                onClick={() => reorderHeroBanners(index, index + 1)}
+                                className="p-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                                title="Move Slide Down"
+                              >
+                                <ArrowDown className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Replace Image Action */}
+                              <button
+                                onClick={() => {
+                                  setReplacingBannerId(slide.id);
+                                  bannerReplaceFileInputRef.current?.click();
+                                }}
+                                className="px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                                title="Upload new photo for this banner"
+                              >
+                                <Upload className="w-3.5 h-3.5" />
+                                <span>Replace Photo</span>
+                              </button>
+
+                              {/* Duplicate Slide */}
+                              <button
+                                onClick={() => {
+                                  duplicateHeroBannerSlide(slide.id);
+                                  showToast('Banner Duplicated', 'success', 'Slide copied successfully');
+                                }}
+                                className="p-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 cursor-pointer"
+                                title="Duplicate Slide"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Toggle Active / Hide */}
+                              <button
+                                onClick={() => updateHeroBannerSlide(slide.id, { isActive: slide.isActive === false ? true : false })}
+                                className={`p-2 rounded-xl border cursor-pointer ${
+                                  slide.isActive === false
+                                    ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 text-amber-700'
+                                    : 'border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300'
+                                }`}
+                                title={slide.isActive === false ? 'Publish Slide' : 'Hide Slide'}
+                              >
+                                {slide.isActive === false ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+
+                              {/* Edit details toggle */}
+                              <button
+                                onClick={() => setSelectedBannerId(isEditing ? null : slide.id)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
+                                  isEditing
+                                    ? 'bg-emerald-700 text-white'
+                                    : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-800 dark:text-gray-200'
+                                }`}
+                              >
+                                <SlidersHorizontal className="w-3.5 h-3.5" />
+                                <span>{isEditing ? 'Close Editor' : 'Edit Slide'}</span>
+                              </button>
+
+                              {/* Delete slide */}
+                              <button
+                                onClick={() => {
+                                  if (heroBanners.length <= 1) {
+                                    showToast('Cannot Delete', 'warning', 'Keep at least 1 hero banner on your storefront');
+                                    return;
+                                  }
+                                  if (window.confirm('Are you sure you want to delete this hero banner slide?')) {
+                                    deleteHeroBannerSlide(slide.id);
+                                    showToast('Banner Removed', 'success', 'Slide deleted from carousel');
+                                  }
+                                }}
+                                className="p-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 cursor-pointer"
+                                title="Delete Banner"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Expanded Full In-Place Slide Editor */}
+                          {isEditing && (
+                            <div className="p-5 sm:p-6 bg-white dark:bg-[#142217] border-t border-emerald-200 dark:border-emerald-900/50 space-y-6 animate-fade-in">
+                              
+                              {/* Photo URL & Quick Switch */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                    Banner Image URL (100% Full-Frame Container Display)
+                                  </label>
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="url"
+                                      value={slide.imageUrl}
+                                      onChange={(e) => updateHeroBannerSlide(slide.id, { imageUrl: e.target.value })}
+                                      className="flex-1 px-3.5 py-2 bg-[#fbfdfb] dark:bg-[#0e1710] border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-mono"
+                                      placeholder="https://..."
+                                    />
+                                    <button
+                                      onClick={() => {
+                                        setReplacingBannerId(slide.id);
+                                        bannerReplaceFileInputRef.current?.click();
+                                      }}
+                                      className="px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                                    >
+                                      <Upload className="w-3.5 h-3.5" />
+                                      <span>Upload</span>
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                    Image Alt Tag (SEO & Accessibility)
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={slide.imageAlt || ''}
+                                    onChange={(e) => updateHeroBannerSlide(slide.id, { imageAlt: e.target.value })}
+                                    className="w-full px-3.5 py-2 bg-[#fbfdfb] dark:bg-[#0e1710] border border-gray-200 dark:border-gray-700 rounded-xl text-xs"
+                                    placeholder="e.g. 100% Organic Vermicompost & Nursery Plants"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Quick Botanical Preset Image Selector */}
+                              <div>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+                                  Quick Curated Nursery Photography (1-Click Change)
+                                </label>
+                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                                  {[
+                                    { name: 'Vermicompost', url: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&w=1800&q=85' },
+                                    { name: 'Monstera House', url: 'https://images.unsplash.com/photo-1545241047-6083a3684587?auto=format&fit=crop&w=1800&q=85' },
+                                    { name: 'Ceramic Pots', url: 'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1800&q=85' },
+                                    { name: 'Greenhouse Oasis', url: 'https://images.unsplash.com/photo-1512428813834-c702c7702b78?auto=format&fit=crop&w=1800&q=85' },
+                                    { name: 'Balcony Garden', url: 'https://images.unsplash.com/photo-1592150621744-aca64f48394a?auto=format&fit=crop&w=1800&q=85' },
+                                    { name: 'Organic Soil Garden', url: 'https://images.unsplash.com/photo-1615811361523-6bd03d7748e7?auto=format&fit=crop&w=1800&q=85' }
+                                  ].map((photo, pIdx) => (
+                                    <button
+                                      key={pIdx}
+                                      onClick={() => updateHeroBannerSlide(slide.id, { imageUrl: photo.url })}
+                                      className={`p-1 rounded-xl border text-left group transition-all overflow-hidden cursor-pointer ${
+                                        slide.imageUrl === photo.url ? 'border-emerald-600 ring-2 ring-emerald-500' : 'border-gray-200 dark:border-gray-700'
+                                      }`}
+                                    >
+                                      <img src={photo.url} alt={photo.name} className="w-full h-12 object-cover rounded-lg mb-1" />
+                                      <span className="block text-[10px] font-semibold text-gray-700 dark:text-gray-300 truncate">
+                                        {photo.name}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Text Overlay Toggle & Settings */}
+                              <div className="p-4 rounded-2xl bg-gray-50 dark:bg-[#0c140e] border border-gray-200 dark:border-gray-800 space-y-4">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <span className="font-bold text-xs sm:text-sm text-gray-800 dark:text-gray-200 block">
+                                      Text Overlay & Typography
+                                    </span>
+                                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                                      Toggle off if your banner image already contains graphic marketing text
+                                    </span>
+                                  </div>
+                                  <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={slide.showTextOverlay !== false}
+                                      onChange={(e) => updateHeroBannerSlide(slide.id, { showTextOverlay: e.target.checked })}
+                                      className="sr-only peer"
+                                    />
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                                  </label>
+                                </div>
+
+                                {slide.showTextOverlay !== false && (
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                                    <div>
+                                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                        Headline Line 1
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={slide.headlineLine1 || ''}
+                                        onChange={(e) => updateHeroBannerSlide(slide.id, { headlineLine1: e.target.value })}
+                                        className="w-full px-3 py-2 bg-white dark:bg-[#142217] border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold"
+                                        placeholder="e.g. Bring Nature"
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                        Headline Line 2 (Emerald Highlight)
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={slide.headlineLine2 || ''}
+                                        onChange={(e) => updateHeroBannerSlide(slide.id, { headlineLine2: e.target.value })}
+                                        className="w-full px-3 py-2 bg-white dark:bg-[#142217] border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-emerald-600"
+                                        placeholder="e.g. Into Your Home"
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                        Subheadline Text
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={slide.subheadline || ''}
+                                        onChange={(e) => updateHeroBannerSlide(slide.id, { subheadline: e.target.value })}
+                                        className="w-full px-3 py-2 bg-white dark:bg-[#142217] border border-gray-200 dark:border-gray-700 rounded-xl text-xs"
+                                        placeholder="e.g. 100% Organic Vermicompost & Nursery Plants"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Button Controls (Enable / Disable / Edit Text & Targets) */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                
+                                {/* Primary Button Box */}
+                                <div className="p-4 rounded-2xl bg-gray-50 dark:bg-[#0c140e] border border-gray-200 dark:border-gray-800 space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                                      Primary Action Button
+                                    </span>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={slide.showPrimaryButton !== false}
+                                        onChange={(e) => updateHeroBannerSlide(slide.id, { showPrimaryButton: e.target.checked })}
+                                        className="sr-only peer"
+                                      />
+                                      <div className="w-9 h-5 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                                    </label>
+                                  </div>
+
+                                  {slide.showPrimaryButton !== false && (
+                                    <div className="grid grid-cols-2 gap-2 pt-1">
+                                      <div>
+                                        <label className="block text-[11px] text-gray-500 dark:text-gray-400 mb-1">
+                                          Button Label
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={slide.primaryBtnText || ''}
+                                          onChange={(e) => updateHeroBannerSlide(slide.id, { primaryBtnText: e.target.value })}
+                                          className="w-full px-3 py-1.5 bg-white dark:bg-[#142217] border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-bold"
+                                          placeholder="SHOP NOW"
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-[11px] text-gray-500 dark:text-gray-400 mb-1">
+                                          Target Destination
+                                        </label>
+                                        <select
+                                          value={slide.primaryTarget || 'shop'}
+                                          onChange={(e) => updateHeroBannerSlide(slide.id, { primaryTarget: e.target.value })}
+                                          className="w-full px-2 py-1.5 bg-white dark:bg-[#142217] border border-gray-200 dark:border-gray-700 rounded-lg text-xs"
+                                        >
+                                          <option value="shop">All Products (Catalog)</option>
+                                          <option value="cat-4">Vermicompost Category</option>
+                                          <option value="cat-1">Plants & Houseplants</option>
+                                          <option value="cat-3">Planters & Ceramic Pots</option>
+                                          <option value="cat-2">Organic Fertilizers</option>
+                                          <option value="cat-6">Plant Care Essentials</option>
+                                          <option value="about">About PLANSIO</option>
+                                        </select>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Secondary Button Box */}
+                                <div className="p-4 rounded-2xl bg-gray-50 dark:bg-[#0c140e] border border-gray-200 dark:border-gray-800 space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                                      Secondary Action Button
+                                    </span>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={slide.showSecondaryButton !== false}
+                                        onChange={(e) => updateHeroBannerSlide(slide.id, { showSecondaryButton: e.target.checked })}
+                                        className="sr-only peer"
+                                      />
+                                      <div className="w-9 h-5 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                                    </label>
+                                  </div>
+
+                                  {slide.showSecondaryButton !== false && (
+                                    <div className="grid grid-cols-2 gap-2 pt-1">
+                                      <div>
+                                        <label className="block text-[11px] text-gray-500 dark:text-gray-400 mb-1">
+                                          Button Label
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={slide.secondaryBtnText || ''}
+                                          onChange={(e) => updateHeroBannerSlide(slide.id, { secondaryBtnText: e.target.value })}
+                                          className="w-full px-3 py-1.5 bg-white dark:bg-[#142217] border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-semibold"
+                                          placeholder="EXPLORE COLLECTION"
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-[11px] text-gray-500 dark:text-gray-400 mb-1">
+                                          Target Destination
+                                        </label>
+                                        <select
+                                          value={slide.secondaryTarget || 'cat-1'}
+                                          onChange={(e) => updateHeroBannerSlide(slide.id, { secondaryTarget: e.target.value })}
+                                          className="w-full px-2 py-1.5 bg-white dark:bg-[#142217] border border-gray-200 dark:border-gray-700 rounded-lg text-xs"
+                                        >
+                                          <option value="cat-1">Plants & Houseplants</option>
+                                          <option value="cat-4">Vermicompost Category</option>
+                                          <option value="cat-3">Planters & Ceramic Pots</option>
+                                          <option value="cat-2">Organic Fertilizers</option>
+                                          <option value="cat-6">Plant Care Essentials</option>
+                                          <option value="shop">All Products (Catalog)</option>
+                                        </select>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                              </div>
+
+                              <div className="flex justify-end pt-2">
+                                <button
+                                  onClick={() => {
+                                    setSelectedBannerId(null);
+                                    showToast('Slide Saved', 'success', 'Banner changes saved and published');
+                                  }}
+                                  className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
+                                >
+                                  <Check className="w-4 h-4" />
+                                  <span>Done Editing Slide</span>
+                                </button>
+                              </div>
+
+                            </div>
+                          )}
+
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* Modal: Add New Banner Slide */}
+            {isAddBannerModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+                <div className="bg-white dark:bg-[#142217] rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-[#e2ede0] dark:border-[#243828] space-y-5 max-h-[90vh] overflow-y-auto">
+                  
+                  <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-gray-800">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 flex items-center justify-center">
+                        <Plus className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-base sm:text-lg text-gray-900 dark:text-white">
+                          Add New Hero Banner Slide
+                        </h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Create full-width promotional banner slide for the homepage carousel
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setIsAddBannerModalOpen(false)}
+                      className="p-2 text-gray-400 hover:text-gray-600 rounded-xl"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleCreateNewBanner} className="space-y-4">
+                    
+                    {/* Image Preview & URL */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                        Banner Image URL (Full Container Display) *
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          required
+                          value={newBannerForm.imageUrl}
+                          onChange={(e) => setNewBannerForm(prev => ({ ...prev, imageUrl: e.target.value }))}
+                          className="flex-1 px-3.5 py-2.5 bg-[#fbfdfb] dark:bg-[#0e1710] border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-mono"
+                          placeholder="https://..."
+                        />
+                        <button
+                          type="button"
+                          onClick={() => bannerNewFileInputRef.current?.click()}
+                          className="px-3.5 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Upload File</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Image Preview Window */}
+                    {newBannerForm.imageUrl && (
+                      <div className="relative w-full h-36 rounded-2xl overflow-hidden bg-gray-900 border border-gray-200 dark:border-gray-700">
+                        <img
+                          src={newBannerForm.imageUrl}
+                          alt="Banner Preview"
+                          className="w-full h-full object-cover object-center"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-transparent to-transparent flex items-center px-6">
+                          <div className="text-white space-y-1">
+                            <span className="text-xs uppercase tracking-wider text-emerald-300 font-bold block">Preview</span>
+                            <h4 className="text-base font-serif font-bold">{newBannerForm.headlineLine1 || 'Headline'}</h4>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Curated Botanical Presets */}
+                    <div>
+                      <span className="block text-[11px] font-bold uppercase text-gray-500 mb-2">Or select from nursery curated photos:</span>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { name: 'Pure Vermicompost', url: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&w=1800&q=85' },
+                          { name: 'Monstera Nursery', url: 'https://images.unsplash.com/photo-1545241047-6083a3684587?auto=format&fit=crop&w=1800&q=85' },
+                          { name: 'Ceramic Planters', url: 'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1800&q=85' }
+                        ].map((photo, idx) => (
+                          <button
+                            type="button"
+                            key={idx}
+                            onClick={() => setNewBannerForm(prev => ({ ...prev, imageUrl: photo.url }))}
+                            className="p-1.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-emerald-500 text-left text-xs text-gray-700 dark:text-gray-300 flex items-center gap-2 cursor-pointer"
+                          >
+                            <img src={photo.url} alt={photo.name} className="w-8 h-8 rounded-lg object-cover" />
+                            <span className="truncate font-semibold text-[11px]">{photo.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Headline Fields */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          Headline Line 1
+                        </label>
+                        <input
+                          type="text"
+                          value={newBannerForm.headlineLine1 || ''}
+                          onChange={(e) => setNewBannerForm(prev => ({ ...prev, headlineLine1: e.target.value }))}
+                          className="w-full px-3 py-2 bg-[#fbfdfb] dark:bg-[#0e1710] border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold"
+                          placeholder="e.g. 100% Organic"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          Headline Line 2 (Accent)
+                        </label>
+                        <input
+                          type="text"
+                          value={newBannerForm.headlineLine2 || ''}
+                          onChange={(e) => setNewBannerForm(prev => ({ ...prev, headlineLine2: e.target.value }))}
+                          className="w-full px-3 py-2 bg-[#fbfdfb] dark:bg-[#0e1710] border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-emerald-600"
+                          placeholder="e.g. Vermicompost & Nursery"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                        Subheadline Description
+                      </label>
+                      <input
+                        type="text"
+                        value={newBannerForm.subheadline || ''}
+                        onChange={(e) => setNewBannerForm(prev => ({ ...prev, subheadline: e.target.value }))}
+                        className="w-full px-3 py-2 bg-[#fbfdfb] dark:bg-[#0e1710] border border-gray-200 dark:border-gray-700 rounded-xl text-xs"
+                        placeholder="e.g. Premium earthworm castings and organic fertilizers for flourishing greens."
+                      />
+                    </div>
+
+                    {/* Buttons */}
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          Primary Button Label
+                        </label>
+                        <input
+                          type="text"
+                          value={newBannerForm.primaryBtnText || 'SHOP NOW'}
+                          onChange={(e) => setNewBannerForm(prev => ({ ...prev, primaryBtnText: e.target.value }))}
+                          className="w-full px-3 py-2 bg-[#fbfdfb] dark:bg-[#0e1710] border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                          Primary Button Target
+                        </label>
+                        <select
+                          value={newBannerForm.primaryTarget || 'shop'}
+                          onChange={(e) => setNewBannerForm(prev => ({ ...prev, primaryTarget: e.target.value }))}
+                          className="w-full px-2 py-2 bg-[#fbfdfb] dark:bg-[#0e1710] border border-gray-200 dark:border-gray-700 rounded-xl text-xs"
+                        >
+                          <option value="shop">All Products (Catalog)</option>
+                          <option value="cat-4">Vermicompost Category</option>
+                          <option value="cat-1">Plants & Houseplants</option>
+                          <option value="cat-3">Planters & Ceramic Pots</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+                      <button
+                        type="button"
+                        onClick={() => setIsAddBannerModalOpen(false)}
+                        className="px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Add Slide to Carousel</span>
+                      </button>
+                    </div>
+
+                  </form>
+
+                </div>
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* TAB: CATEGORIES & CATEGORY PHOTOS STUDIO                      */}
+        {/* ------------------------------------------------------------- */}
+        {activeAdminTab === 'categories' && (
+          <div className="space-y-6 animate-fade-in">
             <div className="bg-white dark:bg-[#142217] rounded-3xl p-6 sm:p-8 shadow-sm border border-[#e2ede0] dark:border-[#243828] space-y-6">
               
-              <div className="flex items-center gap-3.5 pb-6 border-b border-[#e2ede0] dark:border-[#243828]">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#1b4332] to-[#2d6a4f] text-white flex items-center justify-center shadow-md">
-                  <LayoutTemplate className="w-6 h-6 text-[#d8f3dc]" />
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#e2ede0] dark:border-[#243828]">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#1b4332] to-[#2d6a4f] text-white flex items-center justify-center shadow-md">
+                    <FolderTree className="w-6 h-6 text-[#d8f3dc]" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-[#1b4332] dark:text-[#eaf2eb]">
+                      Category & Photo Customization Studio
+                    </h2>
+                    <p className="text-xs text-[#526352] dark:text-[#a3b8a6]">
+                      Change category photos, names, and descriptions. Updates sync instantly to homepage category cards.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold text-[#1b4332] dark:text-[#eaf2eb]">
-                    Hero Banner Template Studio
-                  </h2>
-                  <p className="text-xs text-[#526352] dark:text-[#a3b8a6]">
-                    Select curated homepage hero presets or customize headlines, discount pill text, and promotional banners.
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
+                    {categories.length} Categories Configured
+                  </span>
+                </div>
+              </div>
+
+              {/* Categories Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {categories.map((cat) => {
+                  const productCount = products.filter(p => p.category_id === cat.id).length;
+                  const catImage = cat.image_url || 'https://images.unsplash.com/photo-1545241047-6083a3684587?auto=format&fit=crop&w=600&q=80';
+
+                  return (
+                    <div
+                      key={cat.id}
+                      className="group bg-[#fbfdfb] dark:bg-[#0e1710] rounded-2xl border border-[#e2ede0] dark:border-[#243828] overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+                    >
+                      <div>
+                        {/* Category Image Header */}
+                        <div className="relative aspect-video w-full overflow-hidden bg-gray-100 dark:bg-gray-800">
+                          <img
+                            src={catImage}
+                            alt={cat.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent pointer-events-none" />
+                          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
+                            <span className="font-bold text-sm drop-shadow-sm">{cat.name}</span>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-md">
+                              {productCount} items
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Description */}
+                        <div className="p-4 space-y-2">
+                          <p className="text-xs text-[#526352] dark:text-[#a3b8a6] line-clamp-2">
+                            {cat.description || 'No description provided.'}
+                          </p>
+                          <div className="text-[10px] font-mono text-gray-400">
+                            Slug: /{cat.slug}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action Button */}
+                      <div className="p-4 pt-0">
+                        <button
+                          type="button"
+                          onClick={() => openCategoryEdit(cat)}
+                          className="w-full py-2.5 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span>Edit Photo & Details</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* ------------------------------------------------------------- */}
+        {/* TAB: REVIEWS & AUTHENTIC RATINGS STUDIO                      */}
+        {/* ------------------------------------------------------------- */}
+        {activeAdminTab === 'reviews' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-white dark:bg-[#142217] rounded-3xl p-6 sm:p-8 shadow-sm border border-[#e2ede0] dark:border-[#243828] space-y-6">
+              
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#e2ede0] dark:border-[#243828]">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#1b4332] to-[#2d6a4f] text-white flex items-center justify-center shadow-md">
+                    <Star className="w-6 h-6 text-[#d8f3dc]" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-[#1b4332] dark:text-[#eaf2eb]">
+                      Customer Reviews & Rating Calibrator
+                    </h2>
+                    <p className="text-xs text-[#526352] dark:text-[#a3b8a6]">
+                      Monitor verified customer product reviews and manage authentic 0-rating calibrations.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleResetAllRatings}
+                    className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700/60 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Reset All Ratings to 0.0</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Notice */}
+              <div className="p-4 rounded-2xl bg-[#f6fbf4] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828] flex items-start gap-3">
+                <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-[#526352] dark:text-[#a3b8a6] space-y-1">
+                  <span className="font-bold text-[#1b4332] dark:text-[#eaf2eb] block">
+                    Authentic 0-Rating Policy Active
+                  </span>
+                  <p>
+                    All products in the database default to an unrated (0.0) state until real shoppers write verified reviews in the product detail modal. Clicking &quot;Reset All Ratings&quot; zeroes all averages and review totals cleanly.
                   </p>
                 </div>
               </div>
 
-              {/* 4 Template Presets */}
-              <div className="space-y-3">
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  Select Hero Template Preset
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {HERO_TEMPLATES.map((tmpl) => {
-                    const isSelected = settings.heroBanner?.templateId === tmpl.id;
-                    return (
-                      <div
-                        key={tmpl.id}
-                        onClick={() => applyHeroTemplate(tmpl.id)}
-                        className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-                          isSelected
-                            ? 'border-[#2d6a4f] bg-emerald-50/60 dark:bg-emerald-950/40 ring-2 ring-[#2d6a4f]/30'
-                            : 'border-[#e2ede0] dark:border-[#243828] bg-[#fbfdfb] dark:bg-[#0e1710] hover:border-emerald-300'
-                        }`}
-                      >
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-bold text-xs sm:text-sm text-[#1b4332] dark:text-[#eaf2eb]">
-                              {tmpl.name}
-                            </span>
-                            {isSelected && (
-                              <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                            )}
+              {/* Reviews List */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-[#1b4332] dark:text-[#eaf2eb]">
+                    Submitted Customer Reviews ({allReviews.length})
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={loadReviews}
+                    className="text-xs text-emerald-700 hover:text-emerald-800 flex items-center gap-1 font-semibold"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingReviews ? 'animate-spin' : ''}`} />
+                    <span>Refresh</span>
+                  </button>
+                </div>
+
+                {allReviews.length === 0 ? (
+                  <div className="p-8 text-center bg-[#fbfdfb] dark:bg-[#0e1710] rounded-2xl border border-dashed border-[#e2ede0] dark:border-[#243828]">
+                    <MessageSquare className="w-10 h-10 text-gray-400 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">No user reviews submitted yet</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      All products currently have 0 ratings. When shoppers write reviews on product cards, they will appear here.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {allReviews.map((rev) => {
+                      const relatedProduct = products.find(p => p.id === rev.product_id);
+
+                      return (
+                        <div
+                          key={rev.id}
+                          className="p-4 rounded-2xl bg-[#fbfdfb] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828] space-y-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 block truncate">
+                                {relatedProduct?.name || `Product #${rev.product_id}`}
+                              </span>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <Star
+                                    key={star}
+                                    className={`w-3.5 h-3.5 ${
+                                      star <= rev.rating
+                                        ? 'text-amber-400 fill-amber-400'
+                                        : 'text-gray-300'
+                                    }`}
+                                  />
+                                ))}
+                                <span className="text-xs font-bold text-gray-700 dark:text-gray-300 ml-1">
+                                  {rev.rating}.0
+                                </span>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteReview(rev.id, rev.product_id)}
+                              className="p-1.5 text-gray-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
+                              title="Delete Review"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
-                          <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-2 mb-3">
-                            {tmpl.description}
-                          </p>
+
+                          <div className="space-y-1">
+                            <h4 className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                              {rev.title}
+                            </h4>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              &ldquo;{rev.review_text}&rdquo;
+                            </p>
+                          </div>
+
+                          <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-[11px] text-gray-500">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-gray-700 dark:text-gray-300">
+                                {rev.user_name || 'Customer'}
+                              </span>
+                              {rev.is_verified_purchase && (
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
+                                  Verified Buyer
+                                </span>
+                              )}
+                            </div>
+                            <span>
+                              {rev.created_at ? new Date(rev.created_at).toLocaleDateString() : 'Recent'}
+                            </span>
+                          </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
-                        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg text-center ${
-                          isSelected ? 'bg-[#1b4332] text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                        }`}>
-                          {isSelected ? 'Active Template' : 'Click to Apply'}
-                        </span>
+            </div>
+          </div>
+        )}
+
+        {/* Category Edit Modal */}
+        {editingCategory && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="w-full max-w-lg bg-white dark:bg-[#142217] rounded-3xl p-6 sm:p-8 shadow-2xl border border-[#e2ede0] dark:border-[#243828] space-y-6 max-h-[90vh] overflow-y-auto">
+              
+              <div className="flex items-center justify-between pb-4 border-b border-[#e2ede0] dark:border-[#243828]">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-[#1b4332] dark:text-[#d8f3dc] flex items-center justify-center">
+                    <FolderTree className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-[#1b4332] dark:text-[#eaf2eb]">
+                      Edit Category Photo & Details
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Update {editingCategory.name} storefront card
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setEditingCategory(null)}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-xl"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveCategory} className="space-y-4">
+                {/* Photo Preview */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                    Category Photo Preview
+                  </label>
+                  <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-800 border border-[#e2ede0] dark:border-[#243828] shadow-xs">
+                    {categoryPhotoUrl ? (
+                      <img
+                        src={categoryPhotoUrl}
+                        alt="Category Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                        No photo selected
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Editable Hero Banner Fields */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-[#e2ede0] dark:border-[#243828]">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                      Main Headline
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.heroBanner?.headlineMain || ''}
-                      onChange={(e) => updateHeroBanner({ headlineMain: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-[#fbfdfb] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828] rounded-xl text-xs sm:text-sm font-bold text-[#1b4332] dark:text-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                      Accent Headline (Green Highlight)
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.heroBanner?.headlineAccent || ''}
-                      onChange={(e) => updateHeroBanner({ headlineAccent: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-[#fbfdfb] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828] rounded-xl text-xs sm:text-sm font-bold text-emerald-600"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                      Subheadline Copy
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={settings.heroBanner?.subheadline || ''}
-                      onChange={(e) => updateHeroBanner({ subheadline: e.target.value })}
-                      className="w-full px-4 py-2 bg-[#fbfdfb] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828] rounded-xl text-xs text-gray-700 dark:text-gray-300"
-                    />
+                    )}
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                      Top Announcement & Discount Banner Pill
+                {/* Upload or Image URL */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                      Category Photo URL / File Upload
                     </label>
                     <input
-                      type="text"
-                      value={settings.heroBanner?.discountPillText || ''}
-                      onChange={(e) => updateHeroBanner({ discountPillText: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-[#fbfdfb] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828] rounded-xl text-xs sm:text-sm font-semibold"
+                      type="file"
+                      ref={categoryFileRef}
+                      onChange={handleCategoryFileUpload}
+                      accept="image/*"
+                      className="hidden"
                     />
+                    <button
+                      type="button"
+                      onClick={() => categoryFileRef.current?.click()}
+                      className="text-xs text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1 font-semibold"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload from Device</span>
+                    </button>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                      Hero Banner Image URL
-                    </label>
-                    <input
-                      type="url"
-                      value={settings.heroBanner?.imageUrl || ''}
-                      onChange={(e) => updateHeroBanner({ imageUrl: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-[#fbfdfb] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828] rounded-xl text-xs sm:text-sm text-gray-700 dark:text-gray-300 font-mono"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                        Primary CTA Button
-                      </label>
-                      <input
-                        type="text"
-                        value={settings.heroBanner?.primaryBtnText || 'SHOP NOW'}
-                        onChange={(e) => updateHeroBanner({ primaryBtnText: e.target.value })}
-                        className="w-full px-3 py-2 bg-[#fbfdfb] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828] rounded-xl text-xs font-bold"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                        Secondary CTA Button
-                      </label>
-                      <input
-                        type="text"
-                        value={settings.heroBanner?.secondaryBtnText || 'EXPLORE PLANTS'}
-                        onChange={(e) => updateHeroBanner({ secondaryBtnText: e.target.value })}
-                        className="w-full px-3 py-2 bg-[#fbfdfb] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828] rounded-xl text-xs font-bold"
-                      />
-                    </div>
-                  </div>
+                  <input
+                    type="url"
+                    value={categoryPhotoUrl}
+                    onChange={(e) => setCategoryPhotoUrl(e.target.value)}
+                    placeholder="https://images.unsplash.com/..."
+                    className="w-full px-4 py-2.5 bg-[#fbfdfb] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828] rounded-xl text-xs font-mono text-gray-700 dark:text-gray-300"
+                  />
                 </div>
-              </div>
+
+                {/* Name */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Category Name
+                  </label>
+                  <input
+                    type="text"
+                    value={categoryName}
+                    onChange={(e) => setCategoryName(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-[#fbfdfb] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828] rounded-xl text-xs sm:text-sm font-bold text-[#1b4332] dark:text-white"
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Category Description
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={categoryDescription}
+                    onChange={(e) => setCategoryDescription(e.target.value)}
+                    className="w-full px-4 py-2 bg-[#fbfdfb] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828] rounded-xl text-xs text-gray-700 dark:text-gray-300"
+                  />
+                </div>
+
+                <div className="flex items-center gap-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditingCategory(null)}
+                    className="flex-1 py-3 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-semibold hover:bg-gray-50 dark:hover:bg-gray-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingCategory}
+                    className="flex-1 py-3 bg-[#1b4332] hover:bg-[#143526] text-white rounded-xl text-xs font-bold shadow-md flex items-center justify-center gap-2"
+                  >
+                    {isSavingCategory ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4" />
+                    )}
+                    <span>Save Photo & Changes</span>
+                  </button>
+                </div>
+              </form>
 
             </div>
           </div>
