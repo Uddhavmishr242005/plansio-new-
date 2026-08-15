@@ -1,0 +1,6 @@
+{
+  "name": "PLANSIO",
+  "description": "PLANSIO — Premium vermicompost, organic fertilizers, plants, and gardening accessories e-commerce platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

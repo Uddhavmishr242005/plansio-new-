@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-poppins: 'Poppins', sans-serif;
+    --bg-main: #f6fbf4;
+    --bg-surface: #ffffff;
+    --bg-surface-elevated: #ffffff;
+    --text-primary: #1f2d1f;
+    --text-secondary: #526352;
+    --text-muted: #829282;
+    --brand-primary: #1b4332;
+    --brand-primary-hover: #143526;
+    --brand-secondary: #2d6a4f;
+    --brand-accent: #52b788;
+    --brand-light: #d8f3dc;
+    --brand-light-border: #b7e4c7;
+    --earth-accent: #b08968;
+    --border-color: #e2ede0;
+    --card-shadow: 0 4px 20px -2px rgba(27, 67, 50, 0.06), 0 2px 6px -1px rgba(27, 67, 50, 0.04);
+    --card-shadow-hover: 0 12px 32px -4px rgba(27, 67, 50, 0.12), 0 4px 12px -2px rgba(27, 67, 50, 0.08);
+  }
+
+  .dark {
+    --bg-main: #0e1710;
+    --bg-surface: #142217;
+    --bg-surface-elevated: #1c2e20;
+    --text-primary: #eaf2eb;
+    --text-secondary: #a3b8a6;
+    --text-muted: #6e8471;
+    --brand-primary: #40916c;
+    --brand-primary-hover: #52b788;
+    --brand-secondary: #74c69d;
+    --brand-accent: #95d5b2;
+    --brand-light: #1b3824;
+    --brand-light-border: #284e34;
+    --earth-accent: #ddb892;
+    --border-color: #243828;
+    --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+    --card-shadow-hover: 0 12px 32px -4px rgba(0, 0, 0, 0.6);
+  }
+
+  body {
+    font-family: var(--font-poppins);
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+  }
+}
+
+/* Smooth custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #b7e4c7;
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #284e34;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #52b788;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
