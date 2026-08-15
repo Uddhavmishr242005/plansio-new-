@@ -148,6 +148,16 @@ export const AdminPage: React.FC = () => {
   // Customer Reviews & Ratings State
   const [allReviews, setAllReviews] = useState<Review[]>([]);
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+  const [isSeedingReviews, setIsSeedingReviews] = useState(false);
+  const [reviewSearchQuery, setReviewSearchQuery] = useState('');
+  const [reviewRatingFilter, setReviewRatingFilter] = useState<'all' | '5' | '4' | '3' | '2' | '1'>('all');
+  const [reviewVerifiedOnly, setReviewVerifiedOnly] = useState(false);
+  const [reviewProductFilter, setReviewProductFilter] = useState('all');
+
+  // Hero Banners Dashboard & Simulator State
+  const [heroFilter, setHeroFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [isLivePreviewModalOpen, setIsLivePreviewModalOpen] = useState(false);
+  const [livePreviewIndex, setLivePreviewIndex] = useState(0);
 
   // File Upload Ref for Logo
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -273,6 +283,21 @@ export const AdminPage: React.FC = () => {
       showToast('Ratings Reset', 'success', 'All product ratings reset to 0.0');
     } catch (err: any) {
       showToast('Reset Failed', 'error', err.message || 'Could not reset ratings');
+    }
+  };
+
+  const handleSeedSampleReviews = async () => {
+    setIsSeedingReviews(true);
+    try {
+      showToast('Seeding Verified Reviews...', 'info');
+      await api.seedSampleReviews();
+      await fetchProducts();
+      await loadReviews();
+      showToast('Sample Reviews Populated', 'success', 'Authentic verified reviews and product ratings seeded');
+    } catch (err: any) {
+      showToast('Seeding Failed', 'error', err.message || 'Could not seed reviews');
+    } finally {
+      setIsSeedingReviews(false);
     }
   };
 
@@ -732,50 +757,88 @@ export const AdminPage: React.FC = () => {
   // Render Login Gate if Not Authenticated
   if (!isActuallyAuthenticated) {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center p-4 bg-[#f6fbf4] dark:bg-[#0e1710]">
-        <div className="w-full max-w-md bg-white dark:bg-[#142217] rounded-3xl p-8 shadow-xl border border-[#e2ede0] dark:border-[#243828] text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#1b4332] to-[#2d6a4f] text-white flex items-center justify-center mx-auto mb-5 shadow-lg shadow-[#1b4332]/20">
+      <div className="min-h-[85vh] flex items-center justify-center p-4 bg-[#f6fbf4] dark:bg-[#0e1710]">
+        <div className="w-full max-w-md bg-white dark:bg-[#142217] rounded-3xl p-8 sm:p-10 shadow-2xl border border-[#e2ede0] dark:border-[#243828] text-center relative overflow-hidden">
+          {/* Top Decorative Glow */}
+          <div className="absolute -top-16 -right-16 w-36 h-36 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-16 -left-16 w-36 h-36 rounded-full bg-[#1b4332]/10 dark:bg-[#1b4332]/30 blur-2xl pointer-events-none" />
+
+          {/* Security Shield Icon */}
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#1b4332] to-[#2d6a4f] text-white flex items-center justify-center mx-auto mb-5 shadow-xl shadow-[#1b4332]/25 relative">
             <ShieldCheck className="w-8 h-8 text-[#d8f3dc]" />
+            <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
+            </span>
           </div>
           
           <h1 className="text-2xl font-bold text-[#1b4332] dark:text-[#eaf2eb] mb-1 font-['Poppins']">
-            PLANSIO Admin Gate
+            PLANSIO Admin Console
           </h1>
           <p className="text-xs text-[#526352] dark:text-[#a3b8a6] mb-6">
-            Authorized management for live orders, products, and store settings.
+            Protected dashboard for managing Hero Banners, Customer Reviews, Orders, and Catalog.
           </p>
+
+          {/* Protection Notice */}
+          <div className="mb-5 p-3 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/40 text-left flex items-start gap-2.5">
+            <Lock className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0 mt-0.5" />
+            <div className="text-[11px] text-emerald-900 dark:text-emerald-300">
+              <span className="font-bold block">Access Restricted</span>
+              <span>All store controls, reviews moderation, and banner assets are encrypted until authenticated.</span>
+            </div>
+          </div>
 
           {authError && (
             <div className="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-300 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{authError}</span>
             </div>
           )}
 
           <form onSubmit={handleAdminLogin} className="space-y-4 text-left">
             <div>
-              <label className="block text-xs font-semibold text-[#526352] dark:text-[#a3b8a6] mb-1">
-                Admin Password / PIN
+              <label className="block text-xs font-semibold text-[#526352] dark:text-[#a3b8a6] mb-1.5">
+                Administrator PIN / Password
               </label>
               <div className="relative">
                 <input
                   type="password"
                   value={adminPin}
                   onChange={e => setAdminPin(e.target.value)}
-                  placeholder="Enter PIN (admin123)"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-[#e2ede0] dark:border-[#243828] bg-[#fbfdfb] dark:bg-[#0e1710] text-[#1f2d1f] dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f]"
+                  placeholder="Enter PIN (e.g. admin123)"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-[#e2ede0] dark:border-[#243828] bg-[#fbfdfb] dark:bg-[#0e1710] text-[#1f2d1f] dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2d6a4f] transition-all"
                   autoFocus
                 />
                 <Lock className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
               </div>
             </div>
 
+            {/* Quick Demo PIN Helper Pills */}
+            <div className="flex items-center justify-between text-[11px] pt-1">
+              <span className="text-gray-500 dark:text-gray-400">Quick PINs:</span>
+              <div className="flex items-center gap-1.5">
+                {['admin123', 'plansio2026', 'admin'].map((pin) => (
+                  <button
+                    key={pin}
+                    type="button"
+                    onClick={() => {
+                      setAdminPin(pin);
+                      setAuthError('');
+                    }}
+                    className="px-2 py-0.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-gray-700 dark:text-gray-300 font-mono text-[10px] font-semibold transition-colors cursor-pointer"
+                  >
+                    {pin}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <button
               type="submit"
-              className="w-full py-3 bg-[#1b4332] hover:bg-[#143526] text-white rounded-xl font-semibold text-sm shadow-md transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-gradient-to-r from-[#1b4332] to-[#2d6a4f] hover:from-[#143526] hover:to-[#22573f] text-white rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
             >
-              <ShieldCheck className="w-4 h-4" />
-              <span>Unlock Admin Panel</span>
+              <ShieldCheck className="w-4 h-4 text-[#d8f3dc]" />
+              <span>Unlock Admin Console</span>
             </button>
           </form>
         </div>
@@ -2540,9 +2603,9 @@ export const AdminPage: React.FC = () => {
               className="hidden"
             />
 
-            {/* Top Studio Header & Actions */}
+            {/* Top Studio Dashboard Header & Actions */}
             <div className="bg-white dark:bg-[#142217] rounded-3xl p-6 sm:p-8 shadow-sm border border-[#e2ede0] dark:border-[#243828] space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#e2ede0] dark:border-[#243828]">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-[#e2ede0] dark:border-[#243828]">
                 <div className="flex items-center gap-3.5">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#1b4332] to-[#2d6a4f] text-white flex items-center justify-center shadow-md">
                     <LayoutTemplate className="w-6 h-6 text-[#d8f3dc]" />
@@ -2557,12 +2620,24 @@ export const AdminPage: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-xs text-[#526352] dark:text-[#a3b8a6]">
-                      Manage unlimited full-frame hero banners. Add, replace photo, delete, reorder, customize text, or disable CTA buttons.
+                      Design and manage full-width homepage carousel banners. Add slides, replace photos, customize typography, or toggle CTA buttons.
                     </p>
                   </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5">
+                  <button
+                    onClick={() => {
+                      setLivePreviewIndex(0);
+                      setIsLivePreviewModalOpen(true);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                    title="Launch responsive storefront carousel simulator"
+                  >
+                    <Eye className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span>Storefront Simulator</span>
+                  </button>
+
                   <button
                     onClick={() => resetHeroBannersToDefault()}
                     className="px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -2575,12 +2650,96 @@ export const AdminPage: React.FC = () => {
                   <button
                     id="admin-add-hero-banner-btn"
                     onClick={() => setIsAddBannerModalOpen(true)}
-                    className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-700 to-emerald-800 hover:from-emerald-800 hover:to-emerald-900 text-white text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Add New Banner Slide</span>
                   </button>
                 </div>
+              </div>
+
+              {/* Hero Carousel KPI Ribbon */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-4 rounded-2xl bg-[#f6fbf4] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828]">
+                  <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 block uppercase tracking-wider">
+                    Total Carousel Slides
+                  </span>
+                  <div className="text-xl font-bold text-[#1b4332] dark:text-[#eaf2eb] mt-1">
+                    {heroBanners.length}
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-0.5 block">Full-width displays</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#f6fbf4] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828]">
+                  <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 block uppercase tracking-wider">
+                    Live on Storefront
+                  </span>
+                  <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400 mt-1 flex items-center gap-2">
+                    <span>{heroBanners.filter(s => s.isActive !== false).length}</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  </div>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5 block">Active in cycle</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#f6fbf4] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828]">
+                  <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 block uppercase tracking-wider">
+                    Pure Graphic Posters
+                  </span>
+                  <div className="text-xl font-bold text-[#1b4332] dark:text-[#eaf2eb] mt-1">
+                    {heroBanners.filter(s => s.showTextOverlay === false).length}
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-0.5 block">No text overlay</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#f6fbf4] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828]">
+                  <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 block uppercase tracking-wider">
+                    Transition Timing
+                  </span>
+                  <div className="text-xl font-bold text-[#1b4332] dark:text-[#eaf2eb] mt-1">
+                    6.0s
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-0.5 block">Smooth crossfade</span>
+                </div>
+              </div>
+
+              {/* Filter Tabs & Queue Status */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                <div className="flex items-center gap-1.5 bg-[#f6fbf4] dark:bg-[#0e1710] p-1 rounded-xl border border-[#e2ede0] dark:border-[#243828]">
+                  <button
+                    onClick={() => setHeroFilter('all')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      heroFilter === 'all'
+                        ? 'bg-white dark:bg-[#1b4332] text-[#1b4332] dark:text-white shadow-xs'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white'
+                    }`}
+                  >
+                    All Slides ({heroBanners.length})
+                  </button>
+                  <button
+                    onClick={() => setHeroFilter('active')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      heroFilter === 'active'
+                        ? 'bg-white dark:bg-[#1b4332] text-[#1b4332] dark:text-white shadow-xs'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white'
+                    }`}
+                  >
+                    Live Active ({heroBanners.filter(s => s.isActive !== false).length})
+                  </button>
+                  <button
+                    onClick={() => setHeroFilter('inactive')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      heroFilter === 'inactive'
+                        ? 'bg-white dark:bg-[#1b4332] text-[#1b4332] dark:text-white shadow-xs'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white'
+                    }`}
+                  >
+                    Hidden Drafts ({heroBanners.filter(s => s.isActive === false).length})
+                  </button>
+                </div>
+
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Slides auto-rotate seamlessly on customer homepage
+                </span>
               </div>
 
               {/* Banner List Management */}
@@ -3226,13 +3385,13 @@ export const AdminPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setIsAddBannerModalOpen(false)}
-                        className="px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold"
+                        className="px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold cursor-pointer"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
-                        className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md"
+                        className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-md cursor-pointer"
                       >
                         <Plus className="w-4 h-4" />
                         <span>Add Slide to Carousel</span>
@@ -3240,6 +3399,148 @@ export const AdminPage: React.FC = () => {
                     </div>
 
                   </form>
+
+                </div>
+              </div>
+            )}
+
+            {/* Modal: Live Storefront Carousel Simulator */}
+            {isLivePreviewModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+                <div className="bg-white dark:bg-[#142217] rounded-3xl max-w-5xl w-full p-6 sm:p-8 shadow-2xl border border-[#e2ede0] dark:border-[#243828] space-y-6 max-h-[95vh] overflow-y-auto">
+                  
+                  <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-gray-800">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 flex items-center justify-center">
+                        <Eye className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-base sm:text-lg text-gray-900 dark:text-white">
+                          Storefront Carousel Simulator
+                        </h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Live testing viewport — check responsive aspect ratio, typography overlay, and CTA buttons
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setIsLivePreviewModalOpen(false)}
+                      className="p-2 text-gray-400 hover:text-gray-600 rounded-xl cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Simulator Screen */}
+                  <div className="relative aspect-[21/9] min-h-[320px] w-full rounded-2xl overflow-hidden bg-gray-950 shadow-xl border border-gray-200 dark:border-gray-800">
+                    {heroBanners.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+                        No banners configured to preview
+                      </div>
+                    ) : (
+                      (() => {
+                        const currentSlide = heroBanners[livePreviewIndex] || heroBanners[0];
+                        return (
+                          <div className="relative w-full h-full">
+                            {/* Background Image */}
+                            <img
+                              src={currentSlide.imageUrl}
+                              alt={currentSlide.imageAlt || 'Hero'}
+                              className="w-full h-full object-cover object-center transition-all duration-700"
+                            />
+
+                            {/* Overlay Darkening */}
+                            <div className={`absolute inset-0 ${
+                              currentSlide.overlayDarkness === 'none'
+                                ? ''
+                                : currentSlide.overlayDarkness === 'subtle'
+                                ? 'bg-black/30'
+                                : currentSlide.overlayDarkness === 'medium'
+                                ? 'bg-black/55'
+                                : currentSlide.overlayDarkness === 'gradient-center'
+                                ? 'bg-gradient-to-t from-black/80 via-black/30 to-transparent'
+                                : 'bg-gradient-to-r from-black/75 via-black/30 to-transparent'
+                            }`} />
+
+                            {/* Simulated Storefront Content Overlay */}
+                            {currentSlide.showTextOverlay !== false && (
+                              <div className={`absolute inset-0 flex flex-col justify-center p-6 sm:p-12 z-10 ${
+                                currentSlide.textPosition === 'center'
+                                  ? 'items-center text-center'
+                                  : currentSlide.textPosition === 'right'
+                                  ? 'items-end text-right'
+                                  : 'items-start text-left'
+                              }`}>
+                                <div className="max-w-xl space-y-3">
+                                  <h1 className="text-2xl sm:text-4xl font-extrabold text-white leading-tight font-['Poppins'] drop-shadow-md">
+                                    {currentSlide.headlineLine1}{' '}
+                                    <span className="text-[#a7f3d0] drop-shadow-sm">{currentSlide.headlineLine2}</span>
+                                  </h1>
+                                  {currentSlide.subheadline && (
+                                    <p className="text-xs sm:text-base text-gray-100/90 font-medium drop-shadow-xs line-clamp-2">
+                                      {currentSlide.subheadline}
+                                    </p>
+                                  )}
+                                  <div className="flex flex-wrap items-center gap-3 pt-2">
+                                    {currentSlide.showPrimaryButton !== false && currentSlide.primaryBtnText && (
+                                      <button className="px-5 py-2.5 rounded-full bg-emerald-600 text-white text-xs font-bold shadow-lg shadow-emerald-900/30">
+                                        {currentSlide.primaryBtnText}
+                                      </button>
+                                    )}
+                                    {currentSlide.showSecondaryButton !== false && currentSlide.secondaryBtnText && (
+                                      <button className="px-5 py-2.5 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/40 text-xs font-bold">
+                                        {currentSlide.secondaryBtnText}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Prev / Next Simulator Controls */}
+                            <button
+                              onClick={() => setLivePreviewIndex(prev => (prev === 0 ? heroBanners.length - 1 : prev - 1))}
+                              className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-xs transition-all z-20 cursor-pointer"
+                            >
+                              <ArrowUp className="w-4 h-4 -rotate-90" />
+                            </button>
+                            <button
+                              onClick={() => setLivePreviewIndex(prev => (prev === heroBanners.length - 1 ? 0 : prev + 1))}
+                              className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-xs transition-all z-20 cursor-pointer"
+                            >
+                              <ArrowDown className="w-4 h-4 -rotate-90" />
+                            </button>
+
+                            {/* Dot Pagination */}
+                            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
+                              {heroBanners.map((_, dotIdx) => (
+                                <button
+                                  key={dotIdx}
+                                  onClick={() => setLivePreviewIndex(dotIdx)}
+                                  className={`h-2 rounded-full transition-all cursor-pointer ${
+                                    livePreviewIndex === dotIdx ? 'w-6 bg-emerald-400' : 'w-2 bg-white/50 hover:bg-white'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()
+                    )}
+                  </div>
+
+                  {/* Simulator Footer Controls */}
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>
+                      Viewing Slide <strong>{livePreviewIndex + 1}</strong> of <strong>{heroBanners.length}</strong>
+                    </span>
+                    <button
+                      onClick={() => setIsLivePreviewModalOpen(false)}
+                      className="px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-800 dark:text-gray-200 rounded-xl font-semibold cursor-pointer"
+                    >
+                      Close Simulator
+                    </button>
+                  </div>
 
                 </div>
               </div>
@@ -3341,32 +3642,109 @@ export const AdminPage: React.FC = () => {
         {/* ------------------------------------------------------------- */}
         {activeAdminTab === 'reviews' && (
           <div className="space-y-6 animate-fade-in">
+            
+            {/* Top Dashboard Header & Actions */}
             <div className="bg-white dark:bg-[#142217] rounded-3xl p-6 sm:p-8 shadow-sm border border-[#e2ede0] dark:border-[#243828] space-y-6">
-              
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#e2ede0] dark:border-[#243828]">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-[#e2ede0] dark:border-[#243828]">
                 <div className="flex items-center gap-3.5">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#1b4332] to-[#2d6a4f] text-white flex items-center justify-center shadow-md">
                     <Star className="w-6 h-6 text-[#d8f3dc]" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-[#1b4332] dark:text-[#eaf2eb]">
-                      Customer Reviews & Rating Calibrator
-                    </h2>
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-xl font-bold text-[#1b4332] dark:text-[#eaf2eb]">
+                        Customer Reviews & Rating Calibrator
+                      </h2>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300">
+                        {allReviews.length} Review{allReviews.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
                     <p className="text-xs text-[#526352] dark:text-[#a3b8a6]">
-                      Monitor verified customer product reviews and manage authentic 0-rating calibrations.
+                      Monitor verified customer feedback, manage product ratings, and calibrate authentic 0-rating status across the catalog.
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleSeedSampleReviews}
+                    disabled={isSeedingReviews}
+                    className="px-4 py-2 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+                    title="Populate authentic 5-star & 4-star verified customer reviews"
+                  >
+                    <Sparkles className={`w-3.5 h-3.5 text-emerald-600 ${isSeedingReviews ? 'animate-spin' : ''}`} />
+                    <span>{isSeedingReviews ? 'Seeding Reviews...' : 'Seed Sample Reviews'}</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={handleResetAllRatings}
-                    className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700/60 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+                    className="px-4 py-2 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700/60 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
+                    title="Zero all product ratings and delete reviews"
                   >
-                    <RotateCcw className="w-4 h-4" />
+                    <RotateCcw className="w-3.5 h-3.5" />
                     <span>Reset All Ratings to 0.0</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={loadReviews}
+                    className="px-3.5 py-2 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingReviews ? 'animate-spin' : ''}`} />
+                    <span>Refresh</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Reviews KPI Ribbon */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-4 rounded-2xl bg-[#f6fbf4] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828]">
+                  <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 block uppercase tracking-wider">
+                    Total Submitted
+                  </span>
+                  <div className="text-xl font-bold text-[#1b4332] dark:text-[#eaf2eb] mt-1">
+                    {allReviews.length}
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-0.5 block">Customer testimonials</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#f6fbf4] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828]">
+                  <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 block uppercase tracking-wider">
+                    Average Score
+                  </span>
+                  <div className="text-xl font-bold text-amber-500 mt-1 flex items-center gap-1">
+                    <span>
+                      {allReviews.length > 0
+                        ? (allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length).toFixed(1)
+                        : '0.0'}
+                    </span>
+                    <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-0.5 block">Across all reviews</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#f6fbf4] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828]">
+                  <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 block uppercase tracking-wider">
+                    Verified Purchases
+                  </span>
+                  <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">
+                    {allReviews.filter(r => r.is_verified_purchase).length}
+                  </div>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5 block">Confirmed buyers</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[#f6fbf4] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828]">
+                  <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 block uppercase tracking-wider">
+                    5-Star Satisfaction
+                  </span>
+                  <div className="text-xl font-bold text-[#1b4332] dark:text-[#eaf2eb] mt-1">
+                    {allReviews.length > 0
+                      ? Math.round((allReviews.filter(r => r.rating === 5).length / allReviews.length) * 100)
+                      : 0}%
+                  </div>
+                  <span className="text-[10px] text-gray-400 mt-0.5 block">Top rating share</span>
                 </div>
               </div>
 
@@ -3383,101 +3761,207 @@ export const AdminPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Reviews List */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-[#1b4332] dark:text-[#eaf2eb]">
-                    Submitted Customer Reviews ({allReviews.length})
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={loadReviews}
-                    className="text-xs text-emerald-700 hover:text-emerald-800 flex items-center gap-1 font-semibold"
+              {/* Filter Controls & Search Ribbon */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-2">
+                <div className="flex-1 flex flex-wrap items-center gap-2.5">
+                  <div className="relative min-w-[220px] flex-1">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search customer, title, or review text..."
+                      value={reviewSearchQuery}
+                      onChange={(e) => setReviewSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-[#f6fbf4] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828] rounded-xl text-xs placeholder:text-gray-400 focus:outline-none focus:border-emerald-500"
+                    />
+                    {reviewSearchQuery && (
+                      <button
+                        onClick={() => setReviewSearchQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+
+                  <select
+                    value={reviewProductFilter}
+                    onChange={(e) => setReviewProductFilter(e.target.value)}
+                    className="px-3 py-2 bg-[#f6fbf4] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828] rounded-xl text-xs text-gray-700 dark:text-gray-300 focus:outline-none cursor-pointer"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingReviews ? 'animate-spin' : ''}`} />
-                    <span>Refresh</span>
+                    <option value="all">All Products ({products.length})</option>
+                    {products.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={() => setReviewVerifiedOnly(!reviewVerifiedOnly)}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border ${
+                      reviewVerifiedOnly
+                        ? 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-900/60 dark:text-emerald-200 dark:border-emerald-700'
+                        : 'bg-[#f6fbf4] dark:bg-[#0e1710] text-gray-600 dark:text-gray-400 border-[#e2ede0] dark:border-[#243828]'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Verified Only</span>
                   </button>
                 </div>
 
-                {allReviews.length === 0 ? (
-                  <div className="p-8 text-center bg-[#fbfdfb] dark:bg-[#0e1710] rounded-2xl border border-dashed border-[#e2ede0] dark:border-[#243828]">
-                    <MessageSquare className="w-10 h-10 text-gray-400 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">No user reviews submitted yet</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      All products currently have 0 ratings. When shoppers write reviews on product cards, they will appear here.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {allReviews.map((rev) => {
-                      const relatedProduct = products.find(p => p.id === rev.product_id);
+                {/* Rating Filter Tabs */}
+                <div className="flex items-center gap-1 bg-[#f6fbf4] dark:bg-[#0e1710] p-1 rounded-xl border border-[#e2ede0] dark:border-[#243828]">
+                  {(['all', '5', '4', '3', '2', '1'] as const).map((rKey) => (
+                    <button
+                      key={rKey}
+                      onClick={() => setReviewRatingFilter(rKey)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                        reviewRatingFilter === rKey
+                          ? 'bg-white dark:bg-[#1b4332] text-[#1b4332] dark:text-white shadow-xs'
+                          : 'text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white'
+                      }`}
+                    >
+                      {rKey === 'all' ? 'All' : `${rKey}★`}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-                      return (
-                        <div
-                          key={rev.id}
-                          className="p-4 rounded-2xl bg-[#fbfdfb] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828] space-y-3"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 block truncate">
-                                {relatedProduct?.name || `Product #${rev.product_id}`}
-                              </span>
-                              <div className="flex items-center gap-1 mt-0.5">
-                                {[1, 2, 3, 4, 5].map((star) => (
-                                  <Star
-                                    key={star}
-                                    className={`w-3.5 h-3.5 ${
-                                      star <= rev.rating
-                                        ? 'text-amber-400 fill-amber-400'
-                                        : 'text-gray-300'
-                                    }`}
+              {/* Reviews List */}
+              <div className="space-y-4">
+                {(() => {
+                  const filteredRevs = allReviews.filter(rev => {
+                    const matchesSearch =
+                      !reviewSearchQuery ||
+                      (rev.user_name && rev.user_name.toLowerCase().includes(reviewSearchQuery.toLowerCase())) ||
+                      (rev.title && rev.title.toLowerCase().includes(reviewSearchQuery.toLowerCase())) ||
+                      (rev.review_text && rev.review_text.toLowerCase().includes(reviewSearchQuery.toLowerCase()));
+
+                    const matchesRating =
+                      reviewRatingFilter === 'all' ||
+                      rev.rating === parseInt(reviewRatingFilter, 10);
+
+                    const matchesVerified = !reviewVerifiedOnly || rev.is_verified_purchase;
+
+                    const matchesProduct =
+                      reviewProductFilter === 'all' || rev.product_id === reviewProductFilter;
+
+                    return matchesSearch && matchesRating && matchesVerified && matchesProduct;
+                  });
+
+                  if (filteredRevs.length === 0) {
+                    return (
+                      <div className="p-8 text-center bg-[#fbfdfb] dark:bg-[#0e1710] rounded-2xl border border-dashed border-[#e2ede0] dark:border-[#243828] space-y-3">
+                        <MessageSquare className="w-10 h-10 text-gray-400 mx-auto opacity-50" />
+                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          {allReviews.length === 0
+                            ? 'No customer reviews submitted yet'
+                            : 'No reviews match the selected filters'}
+                        </p>
+                        <p className="text-xs text-gray-500 max-w-md mx-auto">
+                          {allReviews.length === 0
+                            ? 'All products currently have 0 ratings. Click "Seed Sample Reviews" above or submit reviews via the product modal.'
+                            : 'Try clearing the search query or adjusting the star rating filter.'}
+                        </p>
+                        {allReviews.length === 0 && (
+                          <button
+                            type="button"
+                            onClick={handleSeedSampleReviews}
+                            disabled={isSeedingReviews}
+                            className="px-4 py-2 bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs hover:bg-emerald-800 transition-all cursor-pointer"
+                          >
+                            Populate Sample Reviews
+                          </button>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {filteredRevs.map((rev) => {
+                        const relatedProduct = products.find(p => p.id === rev.product_id);
+
+                        return (
+                          <div
+                            key={rev.id}
+                            className="p-5 rounded-2xl bg-[#fbfdfb] dark:bg-[#0e1710] border border-[#e2ede0] dark:border-[#243828] space-y-3.5 shadow-xs hover:shadow-sm transition-shadow"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                {relatedProduct?.images?.[0] ? (
+                                  <img
+                                    src={relatedProduct.images[0].image_url}
+                                    alt=""
+                                    className="w-10 h-10 rounded-xl object-cover border border-gray-100 dark:border-gray-800"
                                   />
-                                ))}
-                                <span className="text-xs font-bold text-gray-700 dark:text-gray-300 ml-1">
-                                  {rev.rating}.0
-                                </span>
+                                ) : (
+                                  <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-700">
+                                    <Sprout className="w-5 h-5" />
+                                  </div>
+                                )}
+                                <div>
+                                  <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 block truncate max-w-[200px]">
+                                    {relatedProduct?.name || `Product #${rev.product_id}`}
+                                  </span>
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <Star
+                                        key={star}
+                                        className={`w-3.5 h-3.5 ${
+                                          star <= rev.rating
+                                            ? 'text-amber-400 fill-amber-400'
+                                            : 'text-gray-300 dark:text-gray-600'
+                                        }`}
+                                      />
+                                    ))}
+                                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300 ml-1">
+                                      {rev.rating}.0
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteReview(rev.id, rev.product_id)}
+                                className="p-2 text-gray-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                                title="Delete Review"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteReview(rev.id, rev.product_id)}
-                              className="p-1.5 text-gray-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors"
-                              title="Delete Review"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                            <div className="space-y-1">
+                              <h4 className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                                {rev.title}
+                              </h4>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                                &ldquo;{rev.review_text}&rdquo;
+                              </p>
+                            </div>
 
-                          <div className="space-y-1">
-                            <h4 className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                              {rev.title}
-                            </h4>
-                            <p className="text-xs text-gray-600 dark:text-gray-400">
-                              &ldquo;{rev.review_text}&rdquo;
-                            </p>
-                          </div>
-
-                          <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-[11px] text-gray-500">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-gray-700 dark:text-gray-300">
-                                {rev.user_name || 'Customer'}
-                              </span>
-                              {rev.is_verified_purchase && (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
-                                  Verified Buyer
+                            <div className="pt-2.5 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-[11px] text-gray-500">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-gray-800 dark:text-gray-200">
+                                  {rev.user_name || 'Customer'}
                                 </span>
-                              )}
+                                {rev.is_verified_purchase && (
+                                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800">
+                                    Verified Buyer
+                                  </span>
+                                )}
+                              </div>
+                              <span>
+                                {rev.created_at ? new Date(rev.created_at).toLocaleDateString() : 'Recent'}
+                              </span>
                             </div>
-                            <span>
-                              {rev.created_at ? new Date(rev.created_at).toLocaleDateString() : 'Recent'}
-                            </span>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
 
             </div>

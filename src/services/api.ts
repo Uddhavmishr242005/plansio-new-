@@ -1121,6 +1121,112 @@ export const resetAllProductRatings = async (): Promise<Product[]> => {
   return resetProducts;
 };
 
+export const seedSampleReviews = async (): Promise<Review[]> => {
+  const sampleReviewsData: {
+    product_slug_or_id: string;
+    user_name: string;
+    rating: number;
+    title: string;
+    review_text: string;
+  }[] = [
+    {
+      product_slug_or_id: 'prod-1',
+      user_name: 'Ananya Deshmukh',
+      rating: 5,
+      title: 'Miraculous soil transformation!',
+      review_text: 'Used this gold vermicompost on my balcony rose plants and monstera. Within 10 days, new glossy green leaves started shooting out! Absolutely zero foul smell and very rich earthy texture.'
+    },
+    {
+      product_slug_or_id: 'prod-1',
+      user_name: 'Rajesh Kulkarni',
+      rating: 5,
+      title: 'Top grade vermiculture product',
+      review_text: 'Clean, moisture-balanced, and completely weed-free. Much better than local nursery compost mixes. My tomato plants are flowering vigorously now.'
+    },
+    {
+      product_slug_or_id: 'prod-2',
+      user_name: 'Sneha Patel',
+      rating: 5,
+      title: 'Healthy, thriving Fiddle Leaf Fig',
+      review_text: 'Arrived in sturdy transit packaging with zero broken leaves. The conditioning in organic soil shows — it acclimated to my living room spot instantly without any leaf drop.'
+    },
+    {
+      product_slug_or_id: 'prod-3',
+      user_name: 'Karthik Raman',
+      rating: 5,
+      title: 'Seaweed extract worked like magic',
+      review_text: 'Diluted 5ml in 1L water as instructed and sprayed on my ferns and pothos. Noticeable boost in foliage color and root vigor in less than a week.'
+    },
+    {
+      product_slug_or_id: 'prod-4',
+      user_name: 'Pooja Nair',
+      rating: 4,
+      title: 'Gorgeous ceramic glaze',
+      review_text: 'The olive green matte finish looks stunning on my Scandinavian plant stand. Came with a proper drainage hole and mesh pad.'
+    },
+    {
+      product_slug_or_id: 'prod-5',
+      user_name: 'Vikramaditya Rao',
+      rating: 5,
+      title: 'Unmatched air-purification and foliage',
+      review_text: 'The Snake Plant Laurentii was lush, healthy, and potted in rich well-draining soil. Highly recommend PLANSIO for live indoor greens.'
+    }
+  ];
+
+  const products = getLocalDb<Product[]>('products', INITIAL_PRODUCTS);
+  const createdReviews: Review[] = [];
+
+  for (const s of sampleReviewsData) {
+    const targetProduct = products.find(p => p.id === s.product_slug_or_id || p.slug === s.product_slug_or_id) || products[0];
+    if (targetProduct) {
+      const newRev: Review = {
+        id: 'rev-' + Math.random().toString(36).substring(2, 9),
+        product_id: targetProduct.id,
+        user_id: 'sample_user_' + Math.random().toString(36).substring(2, 7),
+        user_name: s.user_name,
+        user_avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80',
+        rating: s.rating,
+        title: s.title,
+        review_text: s.review_text,
+        is_verified_purchase: true,
+        created_at: new Date(Date.now() - Math.floor(Math.random() * 7 * 86400000)).toISOString()
+      };
+
+      if (!targetProduct.reviews) targetProduct.reviews = [];
+      // avoid duplicates
+      if (!targetProduct.reviews.some(r => r.title === s.title)) {
+        targetProduct.reviews.unshift(newRev);
+        targetProduct.review_count = targetProduct.reviews.length;
+        const total = targetProduct.reviews.reduce((acc, r) => acc + r.rating, 0);
+        targetProduct.rating = Number((total / targetProduct.reviews.length).toFixed(1));
+        createdReviews.push(newRev);
+      }
+    }
+  }
+
+  setLocalDb('products', products);
+
+  if (isLiveSupabaseConfigured()) {
+    try {
+      const supabase = getSupabaseClient();
+      for (const r of createdReviews) {
+        await supabase.from('reviews').insert({
+          product_id: r.product_id,
+          user_id: r.user_id,
+          rating: r.rating,
+          title: r.title,
+          review_text: r.review_text,
+          is_verified_purchase: true
+        });
+      }
+    } catch (err) {
+      console.warn('Supabase sample reviews sync error:', err);
+    }
+  }
+
+  return getAllReviews();
+};
+
 export const getAllReviews = async (): Promise<Review[]> => {
   const products = getLocalDb<Product[]>('products', INITIAL_PRODUCTS);
   const allReviews: Review[] = [];
